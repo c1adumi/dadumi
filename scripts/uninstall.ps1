@@ -4,6 +4,13 @@ $ErrorActionPreference = 'Stop'
 function Write-Info { Write-Host "==> $args" -ForegroundColor Blue }
 function Write-Ok   { Write-Host "✓  $args" -ForegroundColor Green }
 
+function Remove-IfExists($path) {
+    if (Test-Path $path) {
+        Remove-Item $path -Recurse -Force
+        Write-Ok "Removed $path"
+    }
+}
+
 Write-Info "Uninstalling Dadumi..."
 
 $pkg = Get-Package -Name "Dadumi" -ErrorAction SilentlyContinue
@@ -11,20 +18,49 @@ if ($pkg) {
     $pkg | Uninstall-Package -Force
     Write-Ok "Dadumi uninstalled via package manager"
 } else {
-    $msi = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Filter "Dadumi*" -ErrorAction SilentlyContinue
-    if ($msi) { Remove-Item $msi.FullName -Recurse -Force }
-    Write-Ok "Dadumi installation files removed"
-}
+    $regPaths = @(
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+    $uninstallStr = $null
+    foreach ($rp in $regPaths) {
+        $entry = Get-ItemProperty $rp -ErrorAction SilentlyContinue |
+                 Where-Object { $_.DisplayName -like "Dadumi*" } |
+                 Select-Object -First 1
+        if ($entry) { $uninstallStr = $entry.UninstallString; break }
+    }
 
-$dataPaths = @(
-    "$env:APPDATA\com.gayeonlee.dadumi",
-    "$env:LOCALAPPDATA\com.gayeonlee.dadumi"
-)
-foreach ($path in $dataPaths) {
-    if (Test-Path $path) {
-        Remove-Item $path -Recurse -Force
-        Write-Ok "Removed $path"
+    if ($uninstallStr) {
+        Write-Info "Running uninstaller: $uninstallStr"
+        $uninstallStr = $uninstallStr -replace '"', ''
+        Start-Process $uninstallStr -ArgumentList "/S" -Wait
+        Write-Ok "Dadumi uninstalled"
+    } else {
+        Remove-IfExists "$env:LOCALAPPDATA\Programs\dadumi"
+        Remove-IfExists "$env:LOCALAPPDATA\Programs\Dadumi"
+        Write-Ok "Dadumi installation files removed"
     }
 }
 
-Write-Ok "Dadumi fully removed"
+$dataPaths = @(
+    "$env:APPDATA\dadumi",
+    "$env:APPDATA\Dadumi",
+    "$env:APPDATA\com.gayeonlee.dadumi",
+    "$env:LOCALAPPDATA\dadumi",
+    "$env:LOCALAPPDATA\Dadumi",
+    "$env:LOCALAPPDATA\com.gayeonlee.dadumi",
+    "$env:LOCALAPPDATA\dadumi\EBWebView",
+    "$env:TEMP\dadumi*"
+)
+foreach ($path in $dataPaths) {
+    if ($path -like "*`**") {
+        Get-Item $path -ErrorAction SilentlyContinue | ForEach-Object {
+            Remove-Item $_.FullName -Recurse -Force
+            Write-Ok "Removed $($_.FullName)"
+        }
+    } else {
+        Remove-IfExists $path
+    }
+}
+
+Write-Ok "Dadumi fully removed — no files left behind"

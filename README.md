@@ -36,27 +36,35 @@ rm -rf ~/Library/WebKit/com.gayeonlee.dadumi
 
 ### Windows
 
-PowerShell을 **관리자 권한**으로 열고 한 줄 붙여넣기:
+**PowerShell** (권장):
 
 ```powershell
 irm https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/install.ps1 | iex
+```
+
+**CMD** (명령 프롬프트):
+
+```cmd
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/install.ps1 | iex"
 ```
 
 수동 설치가 필요하면 [Releases](https://github.com/c1adumi/dadumi/releases)에서 `.msi` 파일을 다운로드하세요.
 
 **Windows 삭제**
 
+**PowerShell** (권장):
+
 ```powershell
 irm https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/uninstall.ps1 | iex
 ```
 
-또는 수동으로:
+**CMD** (명령 프롬프트):
 
-```powershell
-Get-Package -Name "Dadumi" | Uninstall-Package
-Remove-Item -Recurse -Force "$env:APPDATA\com.gayeonlee.dadumi"
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\com.gayeonlee.dadumi"
+```cmd
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/uninstall.ps1 | iex"
 ```
+
+> 삭제 스크립트는 앱 바이너리, WebView2 캐시, AppData 데이터를 모두 제거합니다.
 
 ---
 
