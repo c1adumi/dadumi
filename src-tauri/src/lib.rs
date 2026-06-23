@@ -50,10 +50,9 @@ pub fn run() {
                             let (mouse_x, mouse_y) = os_integration::get_mouse_position();
                             
                             if let Some(window) = app_handle.get_webview_window("main") {
-                                // Center window horizontally relative to the cursor
-                                // Overlay width is 550, height is 400
-                                let win_x = (mouse_x - 275.0) as i32;
-                                let win_y = (mouse_y + 15.0) as i32;
+                                // Align the card (at 24px top-left padding inside transparent window) to the cursor
+                                let win_x = (mouse_x + 32.0) as i32;
+                                let win_y = (mouse_y - 24.0) as i32;
                                 
                                 let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(win_x, win_y)));
                                 let _ = window.show();
@@ -97,8 +96,8 @@ pub fn run() {
                             std::thread::spawn(move || {
                                 let (mouse_x, mouse_y) = os_integration::get_mouse_position();
                                 if let Some(window) = app_handle.get_webview_window("main") {
-                                    let win_x = (mouse_x - 275.0) as i32;
-                                    let win_y = (mouse_y + 15.0) as i32;
+                                    let win_x = (mouse_x + 32.0) as i32;
+                                    let win_y = (mouse_y - 24.0) as i32;
                                     let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(win_x, win_y)));
                                     let _ = window.show();
                                     let _ = window.set_focus();
