@@ -18,8 +18,9 @@ export default function FloatingMenu({
   const [copySuccess, setCopySuccess] = useState(false);
 
   // Settings states (loaded from local storage)
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("dadumi_gemini_api_key") || "");
-  const [model, setModel] = useState(() => localStorage.getItem("dadumi_gemini_model") || "gemini-2.5-flash");
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("dadumi_bedrock_api_key") || "");
+  const [region, setRegion] = useState(() => localStorage.getItem("dadumi_bedrock_region") || "ap-southeast-2");
+  const [model, setModel] = useState(() => localStorage.getItem("dadumi_bedrock_model") || "au.anthropic.claude-sonnet-4-6");
   const [systemPrompt, setSystemPrompt] = useState(
     () => localStorage.getItem("dadumi_system_prompt") || "You are a helpful writing assistant. Respond ONLY with the requested text edit or completion, without any intro, outro, explanations, markdown code blocks, or conversational filler."
   );
@@ -41,14 +42,12 @@ export default function FloatingMenu({
     }
   }, [streamedText]);
 
-  // Persist settings
-  const saveSettings = (newKey: string, newModel: string, newSys: string) => {
-    setApiKey(newKey);
-    setModel(newModel);
-    setSystemPrompt(newSys);
-    localStorage.setItem("dadumi_gemini_api_key", newKey);
-    localStorage.setItem("dadumi_gemini_model", newModel);
-    localStorage.setItem("dadumi_system_prompt", newSys);
+  // Persist all settings to localStorage (called on blur, not on every keystroke)
+  const persistSettings = () => {
+    localStorage.setItem("dadumi_bedrock_api_key", apiKey);
+    localStorage.setItem("dadumi_bedrock_region", region);
+    localStorage.setItem("dadumi_bedrock_model", model);
+    localStorage.setItem("dadumi_system_prompt", systemPrompt);
   };
 
   // Preset prompts definition
@@ -56,7 +55,6 @@ export default function FloatingMenu({
     {
       id: "grammar",
       title: "Fix Grammar",
-      desc: "Fix spelling & punctuation",
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
       ),
@@ -65,7 +63,6 @@ export default function FloatingMenu({
     {
       id: "improve",
       title: "Improve Writing",
-      desc: "Enhance flow and clarity",
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/></svg>
       ),
@@ -74,7 +71,6 @@ export default function FloatingMenu({
     {
       id: "professional",
       title: "Professional Tone",
-      desc: "Rewrite for formal business",
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
       ),
@@ -83,7 +79,6 @@ export default function FloatingMenu({
     {
       id: "continue",
       title: "Continue Writing",
-      desc: "Autocompletes next lines",
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
       ),
@@ -94,7 +89,7 @@ export default function FloatingMenu({
   // Core LLM Streaming Handler
   const handleAIQuery = async (instruction: string) => {
     if (isGenerating) return;
-    
+
     setIsGenerating(true);
     setStreamedText("");
 
@@ -104,44 +99,27 @@ export default function FloatingMenu({
     abortControllerRef.current = new AbortController();
 
     try {
-      // 1. If in Tauri, query the Tauri LLM system
-      if (isTauri()) {
-        try {
-          // Send request through Tauri IPC.
-          // Note: Tauri backend will invoke llm stream. We hook into it by listening to 'llm-chunk' event.
-          // Or wait, we can also query the API directly via HTTP from the Webview (which is simpler for front-end prototyping, 
-          // but we provide Tauri IPC command invoke as the primary method if implemented).
-          // Let's implement client-side fetch as a super reliable demo fallback that works everywhere if API key is provided!
-          if (!apiKey) {
-            // If in Tauri and no API key, let's call Tauri command "stream_completion"
-            await invokeCmd("stream_completion", { instruction, text: selectionText });
-            return;
-          }
-        } catch (tauriError) {
-          console.warn("Tauri IPC failed, falling back to direct HTTP stream:", tauriError);
-        }
-      }
-
-      // 2. Direct HTTP Gemini Stream Fallback
       if (!apiKey) {
-        setStreamedText("⚠️ Error: Please open settings (⚙️) and enter your Gemini API Key first.");
+        setStreamedText("⚠️ Error: Please open settings (⚙️) and enter your Bedrock API Key first.");
         setIsGenerating(false);
         return;
       }
 
-      const promptPayload = `${systemPrompt}\n\nTask: ${instruction}\n\nInput Text:\n"""\n${selectionText}\n"""\n\nFinal Output:`;
+      const userMessage = `${systemPrompt}\n\nTask: ${instruction}\n\nInput Text:\n"""\n${selectionText}\n"""\n\nFinal Output:`;
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+        `https://bedrock-runtime.${region}.amazonaws.com/model/${encodeURIComponent(model)}/converse`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            contents: [
+            messages: [
               {
-                parts: [{ text: promptPayload }],
+                role: "user",
+                content: [{ text: userMessage }],
               },
             ],
           }),
@@ -151,53 +129,12 @@ export default function FloatingMenu({
 
       if (!response.ok) {
         const errorJson = await response.json().catch(() => ({}));
-        throw new Error(errorJson?.error?.message || `HTTP error ${response.status}`);
+        throw new Error((errorJson as any)?.message || `HTTP ${response.status}`);
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("ReadableStream not supported by browser/webview.");
-
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        // Keep the last partial line in the buffer
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const cleanLine = line.trim();
-          if (!cleanLine) continue;
-
-          // SSE data starts with 'data: '
-          if (cleanLine.startsWith("data:")) {
-            const jsonStr = cleanLine.substring(5).trim();
-            if (jsonStr === "[DONE]") continue;
-
-            try {
-              const data = JSON.parse(jsonStr);
-              const textChunk = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-              setStreamedText((prev) => prev + textChunk);
-            } catch (e) {
-              // Ignore partial or parsing errors in stream
-            }
-          }
-        }
-      }
-
-      // Read remaining buffer
-      if (buffer && buffer.startsWith("data:")) {
-        try {
-          const jsonStr = buffer.substring(5).trim();
-          const data = JSON.parse(jsonStr);
-          const textChunk = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          setStreamedText((prev) => prev + textChunk);
-        } catch (e) {}
-      }
+      const data = await response.json();
+      const text = (data as any)?.output?.message?.content?.[0]?.text ?? "";
+      setStreamedText(text);
 
     } catch (err: any) {
       if (err.name === "AbortError") {
@@ -222,7 +159,7 @@ export default function FloatingMenu({
   const handlePasteBack = async () => {
     const finalResult = streamedText || selectionText;
     if (!finalResult) return;
-    
+
     // Paste back to target app using Tauri OS hook
     await invokeCmd("paste_text", { text: finalResult });
     onHide();
@@ -259,7 +196,7 @@ export default function FloatingMenu({
               <span className="preset-title">{preset.title}</span>
             </button>
           ))}
-          
+
           <button
             className="preset-card"
             disabled={isGenerating}
@@ -328,8 +265,8 @@ export default function FloatingMenu({
           </button>
         ) : (
           <>
-            <button 
-              className="btn btn-secondary" 
+            <button
+              className="btn btn-secondary"
               onClick={handleCopyToClipboard}
               disabled={!streamedText}
             >
@@ -345,8 +282,8 @@ export default function FloatingMenu({
                 </>
               )}
             </button>
-            <button 
-              className="btn btn-primary" 
+            <button
+              className="btn btn-primary"
               onClick={handlePasteBack}
               disabled={!streamedText && !selectionText}
             >
@@ -364,9 +301,9 @@ export default function FloatingMenu({
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
             Configuration Settings
           </div>
-          <button 
-            className="icon-btn" 
-            onClick={() => setShowSettings(false)}
+          <button
+            className="icon-btn"
+            onClick={() => { persistSettings(); setShowSettings(false); }}
             aria-label="Back"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
@@ -375,32 +312,44 @@ export default function FloatingMenu({
 
         <div className="settings-body">
           <div className="form-group">
-            <label className="form-label" htmlFor="apiKeyInput">Gemini API Key</label>
+            <label className="form-label" htmlFor="apiKeyInput">Bedrock API Key</label>
             <input
               id="apiKeyInput"
               type="password"
               className="form-input"
-              placeholder="AIzaSy..."
+              placeholder="ABSK..."
               value={apiKey}
-              onChange={(e) => saveSettings(e.target.value, model, systemPrompt)}
+              onChange={(e) => setApiKey(e.target.value)}
+              onBlur={persistSettings}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="modelSelect">Gemini Model</label>
-            <div className="select-wrapper">
-              <select
-                id="modelSelect"
-                className="form-select"
-                value={model}
-                onChange={(e) => saveSettings(apiKey, e.target.value, systemPrompt)}
-              >
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fastest)</option>
-                <option value="gemini-2.5-pro">Gemini 2.5 Pro (Analytical)</option>
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Older Fast)</option>
-                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Older Quality)</option>
-              </select>
-            </div>
+            <label className="form-label" htmlFor="regionInput">AWS Region</label>
+            <input
+              id="regionInput"
+              type="text"
+              className="form-input"
+              placeholder="ap-southeast-2"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              onBlur={persistSettings}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="modelSelect">Bedrock Model</label>
+            <select
+              id="modelSelect"
+              className="form-select"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              onBlur={persistSettings}
+            >
+              <option value="au.anthropic.claude-sonnet-4-6">Claude Sonnet 4.6 (Default)</option>
+              <option value="au.anthropic.claude-haiku-4-5-20251001-v1:0">Claude Haiku 4.5 (Fastest)</option>
+              <option value="au.anthropic.claude-sonnet-4-5-20250929-v1:0">Claude Sonnet 4.5</option>
+            </select>
           </div>
 
           <div className="form-group">
@@ -411,7 +360,8 @@ export default function FloatingMenu({
               rows={4}
               style={{ resize: "none" }}
               value={systemPrompt}
-              onChange={(e) => saveSettings(apiKey, model, e.target.value)}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              onBlur={persistSettings}
             />
           </div>
         </div>
