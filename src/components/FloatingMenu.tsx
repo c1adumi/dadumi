@@ -27,6 +27,13 @@ export default function FloatingMenu({
   const streamEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const handleDragStart = async (e: React.MouseEvent) => {
+    if (e.button !== 0 || !isTauri()) return;
+    e.preventDefault();
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    getCurrentWindow().startDragging();
+  };
+
   // Auto scroll streaming response
   useEffect(() => {
     if (streamEndRef.current) {
@@ -232,7 +239,11 @@ export default function FloatingMenu({
   };
 
   return (
-    <div className={`glass-container ${isGenerating ? "processing" : ""}`}>
+    <div data-tauri-drag-region className={`glass-container ${isGenerating ? "processing" : ""}`}>
+      <div data-tauri-drag-region className="drag-handle" onMouseDown={handleDragStart}>
+        <span className="drag-indicator" />
+      </div>
+
       {/* Main Content Area */}
       <main className="scroll-content">
         {/* AI Action Presets */}

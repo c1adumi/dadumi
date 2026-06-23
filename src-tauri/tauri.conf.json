@@ -16,12 +16,13 @@
         "label": "main",
         "title": "Dadumi",
         "width": 550,
-        "height": 400,
+        "height": 620,
         "decorations": false,
         "transparent": true,
         "visible": false,
         "alwaysOnTop": true,
-        "skipTaskbar": true
+        "skipTaskbar": true,
+        "shadow": false
       }
     ],
     "security": {
