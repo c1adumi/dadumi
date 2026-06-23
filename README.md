@@ -4,15 +4,15 @@
 
 ## 설치
 
-[Releases](https://github.com/c1adumi/dadumi/releases) 페이지에서 운영체제에 맞는 파일을 다운로드하세요.
-
 ### macOS
 
+터미널에 한 줄 붙여넣기:
+
 ```bash
-# .dmg 파일 다운로드 후 설치
-open Dadumi_*.aarch64.dmg
-# 열린 창에서 Dadumi를 Applications 폴더로 드래그
+curl -fsSL https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/install.sh | bash
 ```
+
+수동 설치가 필요하면 [Releases](https://github.com/c1adumi/dadumi/releases)에서 `.dmg` 파일을 다운로드하세요.
 
 > **주의**: 코드 사이닝이 적용되지 않아 처음 실행 시 "개발자를 확인할 수 없습니다" 경고가 뜹니다.
 > Finder에서 앱을 **우클릭 → 열기** 하면 한 번만 허용하면 됩니다.
@@ -20,10 +20,13 @@ open Dadumi_*.aarch64.dmg
 **macOS 삭제**
 
 ```bash
-# Applications 폴더에서 제거
-rm -rf /Applications/Dadumi.app
+curl -fsSL https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/uninstall.sh | bash
+```
 
-# 앱 데이터 제거 (선택)
+또는 수동으로:
+
+```bash
+rm -rf /Applications/Dadumi.app
 rm -rf ~/Library/Application\ Support/com.gayeonlee.dadumi
 rm -rf ~/Library/Logs/com.gayeonlee.dadumi
 rm -rf ~/Library/WebKit/com.gayeonlee.dadumi
@@ -33,22 +36,24 @@ rm -rf ~/Library/WebKit/com.gayeonlee.dadumi
 
 ### Windows
 
-```powershell
-# .msi 설치 (권장)
-msiexec /i Dadumi_*_x64_en-US.msi
+PowerShell을 **관리자 권한**으로 열고 한 줄 붙여넣기:
 
-# 또는 .exe 설치 프로그램 실행
-.\Dadumi_*_x64-setup.exe
+```powershell
+irm https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/install.ps1 | iex
 ```
+
+수동 설치가 필요하면 [Releases](https://github.com/c1adumi/dadumi/releases)에서 `.msi` 파일을 다운로드하세요.
 
 **Windows 삭제**
 
 ```powershell
-# 제어판 → 프로그램 추가/제거에서 'Dadumi' 제거
-# 또는 PowerShell로:
-Get-Package -Name "Dadumi" | Uninstall-Package
+irm https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/uninstall.ps1 | iex
+```
 
-# 앱 데이터 제거 (선택)
+또는 수동으로:
+
+```powershell
+Get-Package -Name "Dadumi" | Uninstall-Package
 Remove-Item -Recurse -Force "$env:APPDATA\com.gayeonlee.dadumi"
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\com.gayeonlee.dadumi"
 ```
@@ -57,25 +62,28 @@ Remove-Item -Recurse -Force "$env:LOCALAPPDATA\com.gayeonlee.dadumi"
 
 ### Linux
 
-```bash
-# .deb (Ubuntu / Debian 계열)
-sudo dpkg -i dadumi_*_amd64.deb
+터미널에 한 줄 붙여넣기:
 
-# .AppImage (모든 배포판)
-chmod +x Dadumi_*.AppImage
-./Dadumi_*.AppImage
+```bash
+curl -fsSL https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/install.sh | bash
 ```
 
+수동 설치가 필요하면 [Releases](https://github.com/c1adumi/dadumi/releases)에서 `.deb` 또는 `.AppImage` 파일을 다운로드하세요.
+
 **Linux 삭제**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/c1adumi/dadumi/main/scripts/uninstall.sh | bash
+```
+
+또는 수동으로:
 
 ```bash
 # .deb 로 설치한 경우
 sudo dpkg -r dadumi
 
-# .AppImage 로 설치한 경우 (파일만 삭제)
+# .AppImage 로 설치한 경우
 rm Dadumi_*.AppImage
-
-# 앱 데이터 제거 (선택)
 rm -rf ~/.local/share/com.gayeonlee.dadumi
 rm -rf ~/.config/com.gayeonlee.dadumi
 rm -rf ~/.cache/com.gayeonlee.dadumi
