@@ -1,3 +1,104 @@
+# Dadumi
+
+**Dadumi**는 백그라운드에서 네이티브로 실행되는 크로스 플랫폼(Windows & macOS & Linux) 데스크탑 글쓰기 어시스턴트입니다.
+
+## 설치
+
+[Releases](https://github.com/c1adumi/dadumi/releases) 페이지에서 운영체제에 맞는 파일을 다운로드하세요.
+
+### macOS
+
+```bash
+# .dmg 파일 다운로드 후 설치
+open Dadumi_*.aarch64.dmg
+# 열린 창에서 Dadumi를 Applications 폴더로 드래그
+```
+
+> **주의**: 코드 사이닝이 적용되지 않아 처음 실행 시 "개발자를 확인할 수 없습니다" 경고가 뜹니다.
+> Finder에서 앱을 **우클릭 → 열기** 하면 한 번만 허용하면 됩니다.
+
+**macOS 삭제**
+
+```bash
+# Applications 폴더에서 제거
+rm -rf /Applications/Dadumi.app
+
+# 앱 데이터 제거 (선택)
+rm -rf ~/Library/Application\ Support/com.gayeonlee.dadumi
+rm -rf ~/Library/Logs/com.gayeonlee.dadumi
+rm -rf ~/Library/WebKit/com.gayeonlee.dadumi
+```
+
+---
+
+### Windows
+
+```powershell
+# .msi 설치 (권장)
+msiexec /i Dadumi_*_x64_en-US.msi
+
+# 또는 .exe 설치 프로그램 실행
+.\Dadumi_*_x64-setup.exe
+```
+
+**Windows 삭제**
+
+```powershell
+# 제어판 → 프로그램 추가/제거에서 'Dadumi' 제거
+# 또는 PowerShell로:
+Get-Package -Name "Dadumi" | Uninstall-Package
+
+# 앱 데이터 제거 (선택)
+Remove-Item -Recurse -Force "$env:APPDATA\com.gayeonlee.dadumi"
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\com.gayeonlee.dadumi"
+```
+
+---
+
+### Linux
+
+```bash
+# .deb (Ubuntu / Debian 계열)
+sudo dpkg -i dadumi_*_amd64.deb
+
+# .AppImage (모든 배포판)
+chmod +x Dadumi_*.AppImage
+./Dadumi_*.AppImage
+```
+
+**Linux 삭제**
+
+```bash
+# .deb 로 설치한 경우
+sudo dpkg -r dadumi
+
+# .AppImage 로 설치한 경우 (파일만 삭제)
+rm Dadumi_*.AppImage
+
+# 앱 데이터 제거 (선택)
+rm -rf ~/.local/share/com.gayeonlee.dadumi
+rm -rf ~/.config/com.gayeonlee.dadumi
+rm -rf ~/.cache/com.gayeonlee.dadumi
+```
+
+---
+
+## 릴리즈 방법 (개발자용)
+
+```bash
+# 1. 3개 파일 버전 통일 (package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml)
+# 2. 커밋
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+git commit -m "chore: bump version to x.y.z"
+git push origin main
+
+# 3. 태그 push → GitHub Actions 자동 빌드 + Release 생성
+git tag vx.y.z
+git push origin vx.y.z
+```
+
+---
+
 # In-Line AI: 복사-붙여넣기 없는 사내 AI 통합 글쓰기 어시스턴트
 
 **In-Line AI**는 백그라운드에서 네이티브로 실행되는 크로스 플랫폼(Windows & macOS) 데스크톱 글쓰기 어시스턴트입니다. 사용자가 텍스트 입력이 가능한 모든 환경(Slack, Notion, Chrome, MS Word, 메모장 등)에서 AI를 직접 호출하고, 현재 선택한 텍스트를 읽고, AI 완성을 스트리밍하고, 결과를 자동으로 다시 붙여넣을 수 있도록 하여 수동으로 복사하고 붙여넣는 번거로운 과정을 완전히 없애줍니다.
