@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { invokeCmd, isTauri } from "../utils/tauriBridge";
 import { PROVIDERS, parseProviderResponse, type ProviderID } from "../utils/providers";
 import { useSettings } from "../context/SettingsContext";
+import type { Language } from "../utils/i18n";
 
 interface FloatingMenuProps {
   selectionText: string;
@@ -15,32 +16,19 @@ const IconGear = () => (
   </svg>
 );
 
-const presets = [
-  {
-    id: "grammar",
-    title: "Fix Grammar",
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>,
-    instruction: "Correct any spelling, grammatical, or punctuation errors in this text while keeping the exact meaning and tone unchanged.",
-  },
-  {
-    id: "improve",
-    title: "Improve Writing",
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/></svg>,
-    instruction: "Improve the clarity, vocabulary, flow, and overall quality of this text. Ensure it sounds polished and natural.",
-  },
-  {
-    id: "professional",
-    title: "Professional Tone",
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
-    instruction: "Rewrite this text in a professional, polite, and clear business tone, suitable for emails, Slack, and reports.",
-  },
-  {
-    id: "continue",
-    title: "Continue Writing",
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>,
-    instruction: "Using the text below as the start, write the next 1-2 logical sentences, matching the style and flow.",
-  },
-];
+const PRESET_IDS = ["grammar", "improve", "professional", "continue"] as const;
+const PRESET_ICONS = {
+  grammar: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>,
+  improve: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/></svg>,
+  professional: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+  continue: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>,
+};
+const PRESET_INSTRUCTIONS = {
+  grammar: "Correct any spelling, grammatical, or punctuation errors in this text while keeping the exact meaning and tone unchanged.",
+  improve: "Improve the clarity, vocabulary, flow, and overall quality of this text. Ensure it sounds polished and natural.",
+  professional: "Rewrite this text in a professional, polite, and clear business tone, suitable for emails, Slack, and reports.",
+  continue: "Using the text below as the start, write the next 1-2 logical sentences, matching the style and flow.",
+};
 
 export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProps) {
   const {
@@ -49,10 +37,12 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
     activeProviderDef,
     dynamicModels,
     isFetchingModels,
+    tr,
     setActiveProvider,
     setModel,
     setConfigField,
     setSystemPrompt,
+    setLanguage,
     persistConfigField,
     refreshModels,
   } = useSettings();
@@ -65,6 +55,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
   const [showSettings, setShowSettings] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [draftSystemPrompt, setDraftSystemPrompt] = useState(settings.systemPrompt);
+  const [draftLanguage, setDraftLanguage] = useState<Language>(settings.language ?? "en");
 
   useEffect(() => {
     setDraftSystemPrompt(settings.systemPrompt);
@@ -104,7 +95,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
         return;
       }
 
-      const userMessage = `Task: ${instruction}\n\nInput Text:\n"""\n${selectionText}\n"""\n\nFinal Output:`;
+      const userMessage = `Task: ${instruction}\n\nInput Text:\n${selectionText}\n\nFinal Output:`;
       const response = await activeProviderDef.buildRequest(
         activeProviderSettings.config,
         activeProviderSettings.model,
@@ -154,8 +145,9 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
     });
   };
 
-  const handleCloseSettings = () => {
+  const handleConfirmSettings = () => {
     setSystemPrompt(draftSystemPrompt);
+    setLanguage(draftLanguage);
     setShowSettings(false);
   };
 
@@ -167,22 +159,22 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
 
       <main className="scroll-content">
         <section className="presets-grid">
-          {presets.map((preset) => (
+          {PRESET_IDS.map((id) => (
             <button
-              key={preset.id}
+              key={id}
               className="preset-card"
               disabled={isGenerating || !selectionText}
-              onClick={() => handleAIQuery(preset.instruction)}
+              onClick={() => handleAIQuery(PRESET_INSTRUCTIONS[id])}
             >
-              <span className="preset-icon">{preset.icon}</span>
-              <span className="preset-title">{preset.title}</span>
+              <span className="preset-icon">{PRESET_ICONS[id]}</span>
+              <span className="preset-title">{tr.presets[id]}</span>
             </button>
           ))}
 
           <button className="preset-card" disabled={isGenerating} onClick={() => setShowSettings(true)}>
             <span className="preset-icon"><IconGear /></span>
             <span className="preset-title" style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-              Configure Settings
+              {tr.main.configureSettings}
               <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 400 }}>
                 {activeProviderDef.label}
               </span>
@@ -196,7 +188,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
           <input
             className="custom-input"
             type="text"
-            placeholder="Custom instruction..."
+            placeholder={tr.main.customPlaceholder}
             value={customPrompt}
             onChange={(e) => setCustomPrompt(e.target.value)}
             onKeyDown={(e) => {
@@ -211,7 +203,6 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
             className="send-btn"
             disabled={isGenerating || !customPrompt || !selectionText}
             onClick={() => { handleAIQuery(customPrompt); setCustomPrompt(""); }}
-            title="Send instructions"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
           </button>
@@ -220,7 +211,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
         {(streamedText || isGenerating) && (
           <section className={`result-panel ${streamedText.includes("⚠️") ? "error-state" : ""}`}>
             <div className="section-label">
-              AI Output
+              {tr.main.aiOutput}
               {isGenerating && <span className="cohere-status-badge" style={{ marginLeft: "auto", fontSize: "0.65rem", padding: "1px 6px" }}>GEN</span>}
             </div>
             <div className="stream-area">
@@ -236,20 +227,20 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
         {isGenerating ? (
           <button className="btn btn-secondary" onClick={handleStop}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><rect width="6" height="6" x="9" y="9" rx="1"/></svg>
-            Stop
+            {tr.main.stop}
           </button>
         ) : (
           <>
             <button className="btn btn-secondary" onClick={handleCopyToClipboard} disabled={!streamedText}>
               {copySuccess ? (
-                <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Copied!</>
+                <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>{tr.main.copied}</>
               ) : (
-                <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>Copy</>
+                <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>{tr.main.copy}</>
               )}
             </button>
             <button className="btn btn-primary" onClick={handlePasteBack} disabled={!streamedText && !selectionText}>
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="m17 5-5-3-5 3"/><path d="m7 19 5 3 5-3"/></svg>
-              Insert / Replace
+              {tr.main.insertReplace}
             </button>
           </>
         )}
@@ -259,16 +250,31 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
         <div className="settings-header">
           <div className="settings-title">
             <IconGear />
-            Configuration
+            {tr.settings.title}
           </div>
-          <button className="icon-btn" onClick={handleCloseSettings} aria-label="Back">
+          <button className="icon-btn" onClick={handleConfirmSettings} aria-label="Back">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
           </button>
         </div>
 
         <div className="settings-body">
           <div className="form-group">
-            <label className="form-label">AI Provider</label>
+            <label className="form-label">{tr.settings.language}</label>
+            <div className="provider-tabs">
+              {(["en", "ko"] as Language[]).map((lang) => (
+                <button
+                  key={lang}
+                  className={`provider-tab ${draftLanguage === lang ? "active" : ""}`}
+                  onClick={() => setDraftLanguage(lang)}
+                >
+                  {lang === "en" ? "English" : "한국어"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">{tr.settings.provider}</label>
             <div className="provider-tabs">
               {PROVIDERS.map((p) => (
                 <button
@@ -284,14 +290,13 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
 
           <div className="form-group">
             <label className="form-label" htmlFor="modelSelect">
-              Model
+              {tr.settings.model}
               {activeProviderDef.fetchModels && (
                 <button
                   className="icon-btn"
                   style={{ marginLeft: "auto", width: 20, height: 20 }}
                   onClick={refreshModels}
                   disabled={isFetchingModels}
-                  title="Refresh model list"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: isFetchingModels ? "spin 1s linear infinite" : "none" }}><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
                 </button>
@@ -305,7 +310,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
               disabled={isFetchingModels}
             >
               {isFetchingModels
-                ? <option>Loading models...</option>
+                ? <option>{tr.settings.loadingModels}</option>
                 : availableModels.map((m) => (
                   <option key={m.id} value={m.id}>{m.label}</option>
                 ))
@@ -329,7 +334,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
           ))}
 
           <div className="form-group">
-            <label className="form-label" htmlFor="systemPromptInput">System Instructions</label>
+            <label className="form-label" htmlFor="systemPromptInput">{tr.settings.systemPrompt}</label>
             <textarea
               id="systemPromptInput"
               className="form-input"
@@ -339,6 +344,12 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
               onChange={(e) => setDraftSystemPrompt(e.target.value)}
             />
           </div>
+        </div>
+
+        <div className="settings-footer">
+          <button className="btn btn-confirm" onClick={handleConfirmSettings}>
+            {tr.settings.confirm}
+          </button>
         </div>
       </section>
     </div>

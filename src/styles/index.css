@@ -467,6 +467,22 @@ body,
   overflow-y: auto;
 }
 
+.settings-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-confirm {
+  background: var(--cohere-coral);
+  border: none;
+  color: var(--cohere-near-black);
+  font-weight: 600;
+  min-width: 80px;
+  justify-content: center;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;

@@ -4,13 +4,13 @@ use std::time::Duration;
 use std::sync::atomic::{AtomicI64, Ordering};
 use windows_sys::Win32::Foundation::POINT;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetCursorPos, GetForegroundWindow, SetForegroundWindow,
+    GetCursorPos, GetForegroundWindow, SetForegroundWindow, GetWindowThreadProcessId,
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
     VK_C, VK_V, VK_CONTROL,
 };
-use windows_sys::Win32::System::Threading::{GetCurrentProcessId, GetWindowThreadProcessId};
+use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 
 static SOURCE_HWND: AtomicI64 = AtomicI64::new(0);
 

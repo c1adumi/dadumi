@@ -1,5 +1,6 @@
 import type { ProviderID } from "./providers"
 import { PROVIDERS } from "./providers"
+import type { Language } from "./i18n"
 
 export interface ProviderSettings {
   providerId: ProviderID
@@ -10,6 +11,7 @@ export interface ProviderSettings {
 export interface AppSettings {
   activeProvider: ProviderID
   systemPrompt: string
+  language: Language
   providers: Partial<Record<ProviderID, ProviderSettings>>
 }
 
@@ -40,6 +42,7 @@ export function loadSettings(): AppSettings {
   return {
     activeProvider: "bedrock",
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    language: "en",
     providers: { bedrock: defaultProviderSettings("bedrock") },
   }
 }
@@ -55,7 +58,11 @@ function migrateSettings(settings: AppSettings): AppSettings {
       providers[id as ProviderID] = { ...providerSettings, model: def.models[0]?.id ?? "" }
     }
   }
-  return { ...settings, providers }
+  return {
+    ...settings,
+    language: settings.language ?? "en",
+    providers,
+  }
 }
 
 export function saveSettings(settings: AppSettings): void {

@@ -8,6 +8,7 @@ import {
   type ProviderSettings,
 } from "../utils/settings";
 import { getProvider, type ProviderID, type ProviderDef, type ModelDef } from "../utils/providers";
+import { t, type Language, type T } from "../utils/i18n";
 
 interface SettingsContextValue {
   settings: AppSettings;
@@ -15,10 +16,12 @@ interface SettingsContextValue {
   activeProviderDef: ProviderDef;
   dynamicModels: ModelDef[];
   isFetchingModels: boolean;
+  tr: T;
   setActiveProvider: (id: ProviderID) => void;
   setModel: (model: string) => void;
   setConfigField: (key: string, value: string) => void;
   setSystemPrompt: (prompt: string) => void;
+  setLanguage: (lang: Language) => void;
   persistConfigField: () => void;
   refreshModels: () => void;
 }
@@ -83,6 +86,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     persist({ ...settings, systemPrompt: prompt });
   }, [settings, persist]);
 
+  const setLanguage = useCallback((lang: Language) => {
+    persist({ ...settings, language: lang });
+  }, [settings, persist]);
+
   const refreshModels = useCallback(() => {
     fetchModels(activeProviderDef, activeProviderSettings.config);
   }, [activeProviderDef, activeProviderSettings, fetchModels]);
@@ -93,10 +100,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     activeProviderDef,
     dynamicModels,
     isFetchingModels,
+    tr: t(settings.language ?? "en"),
     setActiveProvider,
     setModel,
     setConfigField,
     setSystemPrompt,
+    setLanguage,
     persistConfigField,
     refreshModels,
   };
