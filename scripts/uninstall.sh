@@ -21,18 +21,23 @@ remove() {
 
 kill_app() {
     local name="$1"
-    if pgrep -x "$name" &>/dev/null; then
-        info "Stopping ${name}..."
-        pkill -SIGTERM -x "$name" 2>/dev/null || true
-        sleep 1
-        pgrep -x "$name" &>/dev/null && pkill -SIGKILL -x "$name" 2>/dev/null || true
-        sleep 0.5
-    fi
+    local name_lower
+    name_lower="$(echo "$name" | tr '[:upper:]' '[:lower:]')"
+    for proc in "$name" "$name_lower" "tauri-app"; do
+        if pgrep -x "$proc" &>/dev/null; then
+            info "Stopping ${proc}..."
+            pkill -SIGTERM -x "$proc" 2>/dev/null || true
+            sleep 1
+            pgrep -x "$proc" &>/dev/null && pkill -SIGKILL -x "$proc" 2>/dev/null || true
+        fi
+    done
+    osascript -e "tell application \"${name}\" to quit" 2>/dev/null || true
+    sleep 0.5
 }
 
 case "$OS" in
   Darwin)
-    kill_app "$APP_NAME"
+    kill_app "$APP_NAME" "$BUNDLE_ID"
 
     remove "/Applications/${APP_NAME}.app"
     remove "$HOME/Library/Application Support/${BUNDLE_ID}"
@@ -47,25 +52,29 @@ case "$OS" in
     find "$HOME/Library/Application Support/CrashReporter" -name "${APP_NAME}*" -delete 2>/dev/null || true
 
     if command -v defaults &>/dev/null; then
-      defaults delete com.apple.dock persistent-apps 2>/dev/null || true
       /usr/bin/python3 -c "
 import subprocess, plistlib, os
 dock_plist = os.path.expanduser('~/Library/Preferences/com.apple.dock.plist')
 try:
     with open(dock_plist, 'rb') as f:
         data = plistlib.load(f)
-    key = 'persistent-apps'
-    if key in data:
+    changed = False
+    for key in ('persistent-apps', 'recent-apps', 'persistent-others'):
+        if key not in data:
+            continue
         before = len(data[key])
         data[key] = [
             item for item in data[key]
             if '${APP_NAME}.app' not in str(item.get('tile-data', {}).get('file-data', {}).get('_CFURLString', ''))
+            and '${APP_NAME}' not in str(item.get('tile-data', {}).get('file-label', ''))
         ]
         if len(data[key]) < before:
-            with open(dock_plist, 'wb') as f:
-                plistlib.dump(data, f)
-            subprocess.run(['killall', 'Dock'], check=False)
-            print('Removed ${APP_NAME} from Dock')
+            changed = True
+    if changed:
+        with open(dock_plist, 'wb') as f:
+            plistlib.dump(data, f)
+        subprocess.run(['killall', 'Dock'], check=False)
+        print('Removed ${APP_NAME} from Dock')
 except Exception as e:
     print(f'Dock cleanup skipped: {e}')
 " 2>/dev/null || true

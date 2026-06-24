@@ -45,6 +45,8 @@ pub fn run() {
                         let app_handle = app.clone();
                         std::thread::spawn(move || {
                             os_integration::save_source_pid();
+                            os_integration::restore_source_app();
+                            std::thread::sleep(std::time::Duration::from_millis(100));
                             let captured_text = os_integration::get_selected_text().unwrap_or_default();
                             let (mouse_x, mouse_y) = os_integration::get_mouse_position();
                             
