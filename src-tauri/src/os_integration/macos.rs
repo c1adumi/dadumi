@@ -3,13 +3,18 @@ use cocoa::base::nil;
 use cocoa::foundation::NSRect;
 use core_graphics::event::{CGEvent, CGEventFlags, CGKeyCode};
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+use objc::{msg_send, sel, sel_impl};
 use arboard::Clipboard;
 use std::thread;
 use std::time::Duration;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 // Virtual keycodes on macOS
 const VK_C: CGKeyCode = 8;
 const VK_V: CGKeyCode = 9;
+
+/// Stores the PID of the app that was frontmost when text was captured.
+static SOURCE_APP_PID: AtomicI32 = AtomicI32::new(-1);
 
 /// Synthesizes and posts a keyboard event with Command modifier
 fn simulate_command_key(key_code: CGKeyCode) {
@@ -73,6 +78,38 @@ pub fn get_selected_text() -> Option<String> {
     }
     
     copied_text
+}
+
+pub fn get_frontmost_pid() -> i32 {
+    unsafe {
+        let cls = objc::runtime::Class::get("NSWorkspace").unwrap();
+        let workspace: *mut objc::runtime::Object = msg_send![cls, sharedWorkspace];
+        let app: *mut objc::runtime::Object = msg_send![workspace, frontmostApplication];
+        msg_send![app, processIdentifier]
+    }
+}
+
+pub fn activate_pid(pid: i32) {
+    unsafe {
+        let cls = objc::runtime::Class::get("NSRunningApplication").unwrap();
+        let app: *mut objc::runtime::Object =
+            msg_send![cls, runningApplicationWithProcessIdentifier: pid];
+        if !app.is_null() {
+            let _: objc::runtime::BOOL =
+                msg_send![app, activateWithOptions: 0x03_u64]; // NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows
+        }
+    }
+}
+
+pub fn save_source_pid() {
+    SOURCE_APP_PID.store(get_frontmost_pid(), Ordering::Relaxed);
+}
+
+pub fn restore_source_app() {
+    let pid = SOURCE_APP_PID.load(Ordering::Relaxed);
+    if pid > 0 {
+        activate_pid(pid);
+    }
 }
 
 /// Inserts the provided text into the active application by writing it to the clipboard,

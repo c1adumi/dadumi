@@ -19,3 +19,6 @@ pub fn get_selected_text() -> Option<String> {
 pub fn paste_text(_text: String) -> bool {
     false
 }
+
+pub fn save_source_pid() {}
+pub fn restore_source_app() {}
