@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import {
   loadSettings,
   saveSettings,
@@ -7,28 +7,54 @@ import {
   type AppSettings,
   type ProviderSettings,
 } from "../utils/settings";
-import { getProvider, type ProviderID, type ProviderDef } from "../utils/providers";
+import { getProvider, type ProviderID, type ProviderDef, type ModelDef } from "../utils/providers";
 
 interface SettingsContextValue {
   settings: AppSettings;
   activeProviderSettings: ProviderSettings;
   activeProviderDef: ProviderDef;
+  dynamicModels: ModelDef[];
+  isFetchingModels: boolean;
   setActiveProvider: (id: ProviderID) => void;
   setModel: (model: string) => void;
   setConfigField: (key: string, value: string) => void;
   setSystemPrompt: (prompt: string) => void;
   persistConfigField: () => void;
+  refreshModels: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
+  const [dynamicModels, setDynamicModels] = useState<ModelDef[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
 
   const persist = useCallback((next: AppSettings) => {
     setSettings(next);
     saveSettings(next);
   }, []);
+
+  const activeProviderDef = getProvider(settings.activeProvider);
+  const activeProviderSettings = getActiveProviderSettings(settings);
+
+  const fetchModels = useCallback(async (providerDef: ProviderDef, config: Record<string, string>) => {
+    if (!providerDef.fetchModels || !config.apiKey) return;
+    setIsFetchingModels(true);
+    try {
+      const models = await providerDef.fetchModels(config);
+      setDynamicModels(models);
+    } catch {
+      setDynamicModels([]);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setDynamicModels([]);
+    fetchModels(activeProviderDef, activeProviderSettings.config);
+  }, [settings.activeProvider]);
 
   const setActiveProvider = useCallback((id: ProviderID) => {
     persist({ ...settings, activeProvider: id });
@@ -47,21 +73,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const persistConfigField = useCallback(() => {
     saveSettings(settings);
-  }, [settings]);
+    fetchModels(activeProviderDef, getActiveProviderSettings(settings).config);
+  }, [settings, activeProviderDef, fetchModels]);
 
   const setSystemPrompt = useCallback((prompt: string) => {
     persist({ ...settings, systemPrompt: prompt });
   }, [settings, persist]);
 
+  const refreshModels = useCallback(() => {
+    fetchModels(activeProviderDef, activeProviderSettings.config);
+  }, [activeProviderDef, activeProviderSettings, fetchModels]);
+
   const value: SettingsContextValue = {
     settings,
-    activeProviderSettings: getActiveProviderSettings(settings),
-    activeProviderDef: getProvider(settings.activeProvider),
+    activeProviderSettings,
+    activeProviderDef,
+    dynamicModels,
+    isFetchingModels,
     setActiveProvider,
     setModel,
     setConfigField,
     setSystemPrompt,
     persistConfigField,
+    refreshModels,
   };
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

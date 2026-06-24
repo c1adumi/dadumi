@@ -47,12 +47,17 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
     settings,
     activeProviderSettings,
     activeProviderDef,
+    dynamicModels,
+    isFetchingModels,
     setActiveProvider,
     setModel,
     setConfigField,
     setSystemPrompt,
     persistConfigField,
+    refreshModels,
   } = useSettings();
+
+  const availableModels = dynamicModels.length > 0 ? dynamicModels : activeProviderDef.models;
 
   const [customPrompt, setCustomPrompt] = useState("");
   const [streamedText, setStreamedText] = useState("");
@@ -274,16 +279,33 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="modelSelect">Model</label>
+            <label className="form-label" htmlFor="modelSelect">
+              Model
+              {activeProviderDef.fetchModels && (
+                <button
+                  className="icon-btn"
+                  style={{ marginLeft: "auto", width: 20, height: 20 }}
+                  onClick={refreshModels}
+                  disabled={isFetchingModels}
+                  title="Refresh model list"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: isFetchingModels ? "spin 1s linear infinite" : "none" }}><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                </button>
+              )}
+            </label>
             <select
               id="modelSelect"
               className="form-select"
               value={activeProviderSettings.model}
               onChange={(e) => setModel(e.target.value)}
+              disabled={isFetchingModels}
             >
-              {activeProviderDef.models.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
+              {isFetchingModels
+                ? <option>Loading models...</option>
+                : availableModels.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))
+              }
             </select>
           </div>
 

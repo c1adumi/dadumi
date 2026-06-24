@@ -25,6 +25,7 @@ export interface ProviderDef {
   readonly label: string
   readonly fields: ProviderField[]
   readonly models: ModelDef[]
+  fetchModels?: (config: Record<string, string>) => Promise<ModelDef[]>
   buildRequest: (
     config: Record<string, string>,
     model: string,
@@ -168,6 +169,20 @@ export const bedrock: ProviderDef = {
     { id: "us.amazon.nova-pro-v1:0", label: "Amazon Nova Pro" },
     { id: "us.amazon.nova-lite-v1:0", label: "Amazon Nova Lite (Fast)" },
   ],
+  async fetchModels(config) {
+    const res = await fetch(
+      "https://bedrock.us-east-1.amazonaws.com/inference-profiles?maxResults=100",
+      { headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` } },
+    )
+    if (!res.ok) return bedrock.models
+    const data = await res.json() as { inferenceProfileSummaries?: { inferenceProfileId: string; inferenceProfileName: string }[] }
+    const profiles = data.inferenceProfileSummaries ?? []
+    const TEXT_PATTERN = /claude|nova-(micro|lite|pro|premier)|fable|opus|sonnet|haiku/i
+    const mapped = profiles
+      .filter((p) => TEXT_PATTERN.test(p.inferenceProfileId))
+      .map((p) => ({ id: p.inferenceProfileId, label: p.inferenceProfileName }))
+    return mapped.length > 0 ? mapped : bedrock.models
+  },
   buildRequest(config, model, systemPrompt, userMessage, signal) {
     const region = bedrockRegionFor(model)
     return fetch(
