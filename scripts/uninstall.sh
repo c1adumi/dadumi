@@ -1,45 +1,95 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
-ok()  { printf '\033[1;32m✓  %s\033[0m\n' "$*"; }
-info(){ printf '\033[1;34m==> %s\033[0m\n' "$*"; }
+ok()   { printf '\033[1;32m✓  %s\033[0m\n' "$*"; }
+info() { printf '\033[1;34m==> %s\033[0m\n' "$*"; }
+warn() { printf '\033[1;33m⚠  %s\033[0m\n' "$*"; }
 
-info "Uninstalling Dadumi..."
+BUNDLE_ID="com.gayeonlee.dadumi"
+APP_NAME="Dadumi"
+
+info "Uninstalling ${APP_NAME}..."
 
 OS="$(uname -s)"
 
+remove() {
+    local path="$1"
+    if [ -e "$path" ] || [ -L "$path" ]; then
+        rm -rf "$path" && ok "Removed: $path" || warn "Failed to remove: $path"
+    fi
+}
+
+kill_app() {
+    local name="$1"
+    if pgrep -x "$name" &>/dev/null; then
+        info "Stopping ${name}..."
+        pkill -SIGTERM -x "$name" 2>/dev/null || true
+        sleep 1
+        pgrep -x "$name" &>/dev/null && pkill -SIGKILL -x "$name" 2>/dev/null || true
+        sleep 0.5
+    fi
+}
+
 case "$OS" in
   Darwin)
-    if pgrep -x "Dadumi" &>/dev/null; then
-      info "Stopping Dadumi..."
-      pkill -x "Dadumi" || true
-      sleep 1
+    kill_app "$APP_NAME"
+
+    remove "/Applications/${APP_NAME}.app"
+    remove "$HOME/Library/Application Support/${BUNDLE_ID}"
+    remove "$HOME/Library/Caches/${BUNDLE_ID}"
+    remove "$HOME/Library/Logs/${BUNDLE_ID}"
+    remove "$HOME/Library/WebKit/${BUNDLE_ID}"
+    remove "$HOME/Library/Saved Application State/${BUNDLE_ID}.savedState"
+    remove "$HOME/Library/Preferences/${BUNDLE_ID}.plist"
+    remove "$HOME/Library/HTTPStorages/${BUNDLE_ID}"
+    remove "$HOME/Library/Cookies/${BUNDLE_ID}"
+
+    find "$HOME/Library/Application Support/CrashReporter" -name "${APP_NAME}*" -delete 2>/dev/null || true
+
+    if command -v defaults &>/dev/null; then
+      defaults delete com.apple.dock persistent-apps 2>/dev/null || true
+      /usr/bin/python3 -c "
+import subprocess, plistlib, os
+dock_plist = os.path.expanduser('~/Library/Preferences/com.apple.dock.plist')
+try:
+    with open(dock_plist, 'rb') as f:
+        data = plistlib.load(f)
+    key = 'persistent-apps'
+    if key in data:
+        before = len(data[key])
+        data[key] = [
+            item for item in data[key]
+            if '${APP_NAME}.app' not in str(item.get('tile-data', {}).get('file-data', {}).get('_CFURLString', ''))
+        ]
+        if len(data[key]) < before:
+            with open(dock_plist, 'wb') as f:
+                plistlib.dump(data, f)
+            subprocess.run(['killall', 'Dock'], check=False)
+            print('Removed ${APP_NAME} from Dock')
+except Exception as e:
+    print(f'Dock cleanup skipped: {e}')
+" 2>/dev/null || true
     fi
 
-    rm -rf /Applications/Dadumi.app
-    rm -rf "$HOME/Library/Application Support/com.gayeonlee.dadumi"
-    rm -rf "$HOME/Library/Logs/com.gayeonlee.dadumi"
-    rm -rf "$HOME/Library/WebKit/com.gayeonlee.dadumi"
-    rm -rf "$HOME/Library/Caches/com.gayeonlee.dadumi"
-    rm -rf "$HOME/Library/Saved Application State/com.gayeonlee.dadumi.savedState"
-    ok "Dadumi removed from macOS"
+    ok "${APP_NAME} fully removed from macOS"
     ;;
+
   Linux)
-    if pgrep -x "dadumi" &>/dev/null; then
-      info "Stopping Dadumi..."
-      pkill -x "dadumi" || true
-      sleep 1
-    fi
+    kill_app "${APP_NAME,,}"
 
     if command -v dpkg &>/dev/null && dpkg -l dadumi &>/dev/null 2>&1; then
-      sudo dpkg -r dadumi
+      info "Removing via dpkg..."
+      sudo dpkg -r dadumi || warn "dpkg removal failed"
     fi
-    rm -f "$HOME/.local/bin/dadumi"
-    rm -rf "$HOME/.local/share/com.gayeonlee.dadumi"
-    rm -rf "$HOME/.config/com.gayeonlee.dadumi"
-    rm -rf "$HOME/.cache/com.gayeonlee.dadumi"
-    ok "Dadumi removed from Linux"
+
+    remove "$HOME/.local/bin/dadumi"
+    remove "$HOME/.local/share/${BUNDLE_ID}"
+    remove "$HOME/.config/${BUNDLE_ID}"
+    remove "$HOME/.cache/${BUNDLE_ID}"
+
+    ok "${APP_NAME} fully removed from Linux"
     ;;
+
   *)
     echo "Unsupported OS: $OS"
     exit 1
