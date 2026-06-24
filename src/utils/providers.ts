@@ -143,7 +143,9 @@ const BEDROCK_PREFIX_REGION: Record<string, string> = {
   "us.": "us-east-1",
   "eu.": "eu-west-1",
   "ap.": "ap-northeast-1",
+  "apac.": "ap-northeast-2",
   "au.": "ap-southeast-2",
+  "jp.": "ap-northeast-1",
 }
 
 function bedrockRegionFor(modelId: string): string {
@@ -160,8 +162,8 @@ export const bedrock: ProviderDef = {
     { key: "apiKey", label: "API Key", type: "password", placeholder: "ABSK..." },
   ],
   models: [
-    { id: "anthropic.claude-sonnet-4-5-20250929-v1:0", label: "Claude Sonnet 4.5" },
-    { id: "anthropic.claude-haiku-4-5-20251001-v1:0", label: "Claude Haiku 4.5 (Fast)" },
+    { id: "apac.anthropic.claude-sonnet-4-5-20250929-v1:0", label: "Claude Sonnet 4.5" },
+    { id: "apac.anthropic.claude-haiku-4-5-20251001-v1:0", label: "Claude Haiku 4.5 (Fast)" },
     { id: "us.amazon.nova-pro-v1:0", label: "Amazon Nova Pro" },
     { id: "us.amazon.nova-lite-v1:0", label: "Amazon Nova Lite (Fast)" },
   ],
