@@ -9,9 +9,30 @@ use std::thread;
 use std::time::Duration;
 use std::sync::atomic::{AtomicI32, Ordering};
 
-// Virtual keycodes on macOS
 const VK_C: CGKeyCode = 8;
 const VK_V: CGKeyCode = 9;
+
+#[link(name = "ApplicationServices", kind = "framework")]
+extern "C" {
+    fn AXIsProcessTrustedWithOptions(options: *const std::ffi::c_void) -> bool;
+}
+
+pub fn request_accessibility_if_needed() {
+    unsafe {
+        let cls = objc::runtime::Class::get("NSDictionary").unwrap();
+        let key: *mut objc::runtime::Object = msg_send![
+            objc::runtime::Class::get("NSString").unwrap(),
+            stringWithUTF8String: b"AXTrustedCheckOptionPrompt\0".as_ptr()
+        ];
+        let val: *mut objc::runtime::Object = msg_send![
+            objc::runtime::Class::get("NSNumber").unwrap(),
+            numberWithBool: objc::runtime::YES
+        ];
+        let options: *mut objc::runtime::Object =
+            msg_send![cls, dictionaryWithObject: val forKey: key];
+        AXIsProcessTrustedWithOptions(options as *const std::ffi::c_void);
+    }
+}
 
 /// Stores the PID of the app that was frontmost when text was captured.
 static SOURCE_APP_PID: AtomicI32 = AtomicI32::new(-1);

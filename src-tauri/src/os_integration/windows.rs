@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use windows_sys::Win32::Foundation::POINT;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, GetForegroundWindow, SetForegroundWindow, GetWindowThreadProcessId,
+    MessageBoxW, MB_OK, MB_ICONWARNING, HWND_DESKTOP,
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
@@ -13,6 +14,45 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 
 static SOURCE_HWND: AtomicI64 = AtomicI64::new(0);
+
+pub fn request_accessibility_if_needed() {
+    unsafe {
+        let elevated = is_elevated();
+        if !elevated {
+            return;
+        }
+        let msg: Vec<u16> = "Dadumi is running as administrator.\nText capture may not work in non-elevated apps.\nConsider running Dadumi without administrator privileges."
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let title: Vec<u16> = "Dadumi – Permission Notice"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        MessageBoxW(HWND_DESKTOP, msg.as_ptr(), title.as_ptr(), MB_OK | MB_ICONWARNING);
+    }
+}
+
+fn is_elevated() -> bool {
+    use windows_sys::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+    unsafe {
+        let mut token = 0isize;
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == 0 {
+            return false;
+        }
+        let mut elevation = TOKEN_ELEVATION { TokenIsElevated: 0 };
+        let mut size = std::mem::size_of::<TOKEN_ELEVATION>() as u32;
+        let ok = GetTokenInformation(
+            token,
+            TokenElevation,
+            &mut elevation as *mut _ as *mut _,
+            size,
+            &mut size,
+        );
+        ok != 0 && elevation.TokenIsElevated != 0
+    }
+}
 
 pub fn get_mouse_position() -> (f64, f64) {
     unsafe {

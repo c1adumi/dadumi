@@ -5,6 +5,26 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static SOURCE_WID: AtomicU64 = AtomicU64::new(0);
 
+pub fn request_accessibility_if_needed() {
+    let xdotool_missing = std::process::Command::new("which")
+        .arg("xdotool")
+        .output()
+        .map(|o| !o.status.success())
+        .unwrap_or(true);
+
+    if xdotool_missing {
+        std::process::Command::new("zenity")
+            .args([
+                "--warning",
+                "--title=Dadumi – Missing Dependency",
+                "--text=Dadumi requires <b>xdotool</b> for text capture and paste.\n\nInstall it with:\n  sudo apt install xdotool\n  sudo pacman -S xdotool\n  sudo dnf install xdotool",
+                "--width=400",
+            ])
+            .spawn()
+            .ok();
+    }
+}
+
 pub fn get_mouse_position() -> (f64, f64) {
     let output = std::process::Command::new("xdotool")
         .args(["getmouselocation", "--shell"])

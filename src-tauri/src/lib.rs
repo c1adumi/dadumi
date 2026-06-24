@@ -69,7 +69,8 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
-            // Create tray menu items
+            os_integration::request_accessibility_if_needed();
+
             let show_i = MenuItemBuilder::with_id("show", "Show Assistant").build(app)?;
             let quit_i = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
             let menu = MenuBuilder::new(app).items(&[&show_i, &quit_i]).build()?;
