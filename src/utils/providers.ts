@@ -162,6 +162,7 @@ export const bedrock: ProviderDef = {
     { key: "apiKey", label: "API Key", type: "password", placeholder: "ABSK..." },
   ],
   models: [
+    { id: "us.anthropic.claude-sonnet-4-6", label: "Claude Sonnet 4.6 (Latest)" },
     { id: "us.anthropic.claude-sonnet-4-5-20250929-v1:0", label: "Claude Sonnet 4.5" },
     { id: "us.anthropic.claude-haiku-4-5-20251001-v1:0", label: "Claude Haiku 4.5 (Fast)" },
     { id: "us.amazon.nova-pro-v1:0", label: "Amazon Nova Pro" },
