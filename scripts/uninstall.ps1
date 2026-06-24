@@ -13,6 +13,13 @@ function Remove-IfExists($path) {
 
 Write-Info "Uninstalling Dadumi..."
 
+$proc = Get-Process -Name "Dadumi" -ErrorAction SilentlyContinue
+if ($proc) {
+    Write-Info "Stopping Dadumi..."
+    $proc | Stop-Process -Force
+    Start-Sleep -Seconds 1
+}
+
 $pkg = Get-Package -Name "Dadumi" -ErrorAction SilentlyContinue
 if ($pkg) {
     $pkg | Uninstall-Package -Force

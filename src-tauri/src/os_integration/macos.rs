@@ -54,29 +54,24 @@ pub fn get_mouse_position() -> (f64, f64) {
 /// It uses clipboard backup and restore mechanism to bypass clipboard pollution.
 pub fn get_selected_text() -> Option<String> {
     let mut clipboard = Clipboard::new().ok()?;
-    
-    // 1. Backup existing clipboard content
+
     let original_content = clipboard.get_text().ok();
-    
-    // 2. Clear clipboard text to detect if new text gets copied
-    let _ = clipboard.set_text("".to_string());
-    
-    // 3. Emulate Cmd + C
+
+    let sentinel = "__dadumi_sentinel__";
+    let _ = clipboard.set_text(sentinel.to_string());
+
     simulate_command_key(VK_C);
-    
-    // 4. Give the OS and active app some time to process the shortcut and update clipboard
-    thread::sleep(Duration::from_millis(150));
-    
-    // 5. Read the captured selection from the clipboard
-    let copied_text = clipboard.get_text().ok().filter(|s| !s.is_empty());
-    
-    // 6. Restore original clipboard content
-    if let Some(orig) = original_content {
-        let _ = clipboard.set_text(orig);
-    } else {
-        let _ = clipboard.set_text("".to_string());
+
+    let copied_text = (0..8).find_map(|_| {
+        thread::sleep(Duration::from_millis(50));
+        clipboard.get_text().ok().filter(|s| s != sentinel && !s.is_empty())
+    });
+
+    match original_content {
+        Some(orig) if orig != sentinel => { let _ = clipboard.set_text(orig); }
+        _ => { let _ = clipboard.set_text("".to_string()); }
     }
-    
+
     copied_text
 }
 
@@ -130,9 +125,8 @@ pub fn paste_text(text: String) -> bool {
     
     // 3. Emulate Cmd + V
     simulate_command_key(VK_V);
-    
-    // 4. Wait for the target application to read from the clipboard and perform the paste
-    thread::sleep(Duration::from_millis(150));
+
+    thread::sleep(Duration::from_millis(300));
     
     // 5. Restore original clipboard content
     if let Some(orig) = original_content {

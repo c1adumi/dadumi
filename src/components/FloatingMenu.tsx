@@ -66,6 +66,10 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
   const [copySuccess, setCopySuccess] = useState(false);
   const [draftSystemPrompt, setDraftSystemPrompt] = useState(settings.systemPrompt);
 
+  useEffect(() => {
+    setDraftSystemPrompt(settings.systemPrompt);
+  }, [settings.systemPrompt]);
+
   const streamEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 

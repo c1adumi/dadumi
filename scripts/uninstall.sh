@@ -10,13 +10,27 @@ OS="$(uname -s)"
 
 case "$OS" in
   Darwin)
+    if pgrep -x "Dadumi" &>/dev/null; then
+      info "Stopping Dadumi..."
+      pkill -x "Dadumi" || true
+      sleep 1
+    fi
+
     rm -rf /Applications/Dadumi.app
     rm -rf "$HOME/Library/Application Support/com.gayeonlee.dadumi"
     rm -rf "$HOME/Library/Logs/com.gayeonlee.dadumi"
     rm -rf "$HOME/Library/WebKit/com.gayeonlee.dadumi"
+    rm -rf "$HOME/Library/Caches/com.gayeonlee.dadumi"
+    rm -rf "$HOME/Library/Saved Application State/com.gayeonlee.dadumi.savedState"
     ok "Dadumi removed from macOS"
     ;;
   Linux)
+    if pgrep -x "dadumi" &>/dev/null; then
+      info "Stopping Dadumi..."
+      pkill -x "dadumi" || true
+      sleep 1
+    fi
+
     if command -v dpkg &>/dev/null && dpkg -l dadumi &>/dev/null 2>&1; then
       sudo dpkg -r dadumi
     fi

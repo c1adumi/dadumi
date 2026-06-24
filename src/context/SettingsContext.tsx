@@ -54,6 +54,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setDynamicModels([]);
     fetchModels(activeProviderDef, activeProviderSettings.config);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.activeProvider]);
 
   const setActiveProvider = useCallback((id: ProviderID) => {
@@ -66,9 +67,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const setConfigField = useCallback((key: string, value: string) => {
     const current = getActiveProviderSettings(settings);
-    setSettings(updateProviderSettings(settings, settings.activeProvider, {
+    const updated = updateProviderSettings(settings, settings.activeProvider, {
       config: { ...current.config, [key]: value },
-    }));
+    });
+    setSettings(updated);
+    saveSettings(updated);
   }, [settings]);
 
   const persistConfigField = useCallback(() => {
