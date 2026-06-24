@@ -56,3 +56,6 @@ pub fn paste_text(text: String) -> bool {
 
     true
 }
+
+pub fn save_source_pid() {}
+pub fn restore_source_app() {}

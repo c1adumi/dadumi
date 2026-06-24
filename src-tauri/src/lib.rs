@@ -24,8 +24,8 @@ fn hide_window(window: tauri::WebviewWindow) {
 #[tauri::command]
 fn paste_text(text: String, window: tauri::WebviewWindow) {
     let _ = window.hide();
-    // Wait a tiny bit for focus to shift back to target window before pasting
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    os_integration::restore_source_app();
+    std::thread::sleep(std::time::Duration::from_millis(300));
     os_integration::paste_text(text);
 }
 
@@ -44,6 +44,7 @@ pub fn run() {
                     if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                         let app_handle = app.clone();
                         std::thread::spawn(move || {
+                            os_integration::save_source_pid();
                             let captured_text = os_integration::get_selected_text().unwrap_or_default();
                             let (mouse_x, mouse_y) = os_integration::get_mouse_position();
                             
