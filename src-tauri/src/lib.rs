@@ -46,8 +46,9 @@ pub fn run() {
                         std::thread::spawn(move || {
                             os_integration::save_source_pid();
                             os_integration::restore_source_app();
-                            std::thread::sleep(std::time::Duration::from_millis(100));
+                            std::thread::sleep(std::time::Duration::from_millis(300));
                             let captured_text = os_integration::get_selected_text().unwrap_or_default();
+                            eprintln!("[dadumi] captured_text: {:?}", captured_text);
                             let (mouse_x, mouse_y) = os_integration::get_mouse_position();
                             
                             if let Some(window) = app_handle.get_webview_window("main") {

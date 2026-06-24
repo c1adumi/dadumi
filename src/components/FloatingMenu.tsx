@@ -88,12 +88,6 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
 
   const handleAIQuery = async (instruction: string) => {
     if (isGenerating) return;
-
-    if (!selectionText) {
-      setStreamedText("⚠️ No text selected. Highlight text in any app, then press Alt+Space.");
-      return;
-    }
-
     setIsGenerating(true);
     setStreamedText("");
 
@@ -177,7 +171,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
             <button
               key={preset.id}
               className="preset-card"
-              disabled={isGenerating}
+              disabled={isGenerating || !selectionText}
               onClick={() => handleAIQuery(preset.instruction)}
             >
               <span className="preset-icon">{preset.icon}</span>
@@ -206,16 +200,16 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
             value={customPrompt}
             onChange={(e) => setCustomPrompt(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && customPrompt) {
+              if (e.key === "Enter" && customPrompt && selectionText) {
                 handleAIQuery(customPrompt);
                 setCustomPrompt("");
               }
             }}
-            disabled={isGenerating}
+            disabled={isGenerating || !selectionText}
           />
           <button
             className="send-btn"
-            disabled={isGenerating || !customPrompt}
+            disabled={isGenerating || !customPrompt || !selectionText}
             onClick={() => { handleAIQuery(customPrompt); setCustomPrompt(""); }}
             title="Send instructions"
           >
