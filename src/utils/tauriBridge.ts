@@ -1,19 +1,6 @@
 // Tauri Bridge to support browser preview fallback
 
-let invokeFn: any = null;
-let listenFn: any = null;
-
 const isTauriVal = typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__ !== undefined;
-
-if (isTauriVal) {
-  // Dynamic imports to prevent build errors in environments where Tauri API might not load
-  import("@tauri-apps/api/core").then((module) => {
-    invokeFn = module.invoke;
-  });
-  import("@tauri-apps/api/event").then((module) => {
-    listenFn = module.listen;
-  });
-}
 
 // Registry for mock event listeners
 const mockListeners: { [eventName: string]: ((event: { payload: any }) => void)[] } = {};
@@ -30,12 +17,8 @@ export function isTauri(): boolean {
  */
 export async function invokeCmd(command: string, args?: any): Promise<any> {
   if (isTauriVal) {
-    // Wait for dynamic import if not loaded yet
-    if (!invokeFn) {
-      const module = await import("@tauri-apps/api/core");
-      invokeFn = module.invoke;
-    }
-    return invokeFn(command, args);
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke(command, args);
   }
 
   // Mock implementation for browser development
@@ -64,11 +47,8 @@ export async function listenEvent(
   handler: (payload: any) => void
 ): Promise<() => void> {
   if (isTauriVal) {
-    if (!listenFn) {
-      const module = await import("@tauri-apps/api/event");
-      listenFn = module.listen;
-    }
-    return listenFn(eventName, (event: any) => {
+    const { listen } = await import("@tauri-apps/api/event");
+    return listen(eventName, (event: any) => {
       handler(event.payload);
     });
   }
@@ -77,13 +57,12 @@ export async function listenEvent(
   if (!mockListeners[eventName]) {
     mockListeners[eventName] = [];
   }
-  
+
   const wrappedHandler = (event: { payload: any }) => handler(event.payload);
   mockListeners[eventName].push(wrappedHandler);
 
   console.log(`[Tauri Mock] Registered listener for event: "${eventName}"`);
 
-  // Return unsubscribe function
   return () => {
     mockListeners[eventName] = mockListeners[eventName].filter((h) => h !== wrappedHandler);
     console.log(`[Tauri Mock] Unsubscribed listener from event: "${eventName}"`);
