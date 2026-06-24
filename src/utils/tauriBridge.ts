@@ -18,7 +18,10 @@ export function isTauri(): boolean {
 export async function invokeCmd(command: string, args?: any): Promise<any> {
   if (isTauriVal) {
     const { invoke } = await import("@tauri-apps/api/core");
-    return invoke(command, args);
+    return invoke(command, args).catch((err: any) => {
+      console.error(`[Tauri] Command "${command}" failed:`, err);
+      throw err;
+    });
   }
 
   // Mock implementation for browser development
