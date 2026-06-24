@@ -520,6 +520,36 @@ body,
   color: var(--text-primary);
 }
 
+.provider-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.provider-tab {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.provider-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.provider-tab.active {
+  background: rgba(255, 119, 89, 0.12);
+  border-color: var(--cohere-coral);
+  color: var(--cohere-coral);
+}
+
 /* Dev Simulator Overlay (Monochrome layout) */
 .dev-simulator-bar {
   position: fixed;
