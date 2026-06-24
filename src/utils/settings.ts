@@ -30,7 +30,10 @@ function defaultProviderSettings(providerId: ProviderID): ProviderSettings {
 export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as AppSettings
+    if (raw) {
+      const parsed = JSON.parse(raw) as AppSettings
+      return migrateSettings(parsed)
+    }
   } catch {
     // corrupt storage — fall through to defaults
   }
@@ -39,6 +42,20 @@ export function loadSettings(): AppSettings {
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     providers: { bedrock: defaultProviderSettings("bedrock") },
   }
+}
+
+function migrateSettings(settings: AppSettings): AppSettings {
+  const providers = { ...settings.providers }
+  for (const [id, providerSettings] of Object.entries(providers)) {
+    if (!providerSettings) continue
+    const def = PROVIDERS.find((p) => p.id === id)
+    if (!def) continue
+    const validModel = def.models.some((m) => m.id === providerSettings.model)
+    if (!validModel) {
+      providers[id as ProviderID] = { ...providerSettings, model: def.models[0]?.id ?? "" }
+    }
+  }
+  return { ...settings, providers }
 }
 
 export function saveSettings(settings: AppSettings): void {
