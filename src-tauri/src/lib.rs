@@ -112,8 +112,11 @@ pub fn run() {
                         let app_handle = app.clone();
                         std::thread::spawn(move || {
                             os_integration::save_source_pid();
-                            // Do NOT call restore_source_app() here — source app is still focused
-                            // get_selected_text() sends Ctrl+C while source app has focus
+                            #[cfg(target_os = "macos")]
+                            {
+                                os_integration::restore_source_app();
+                                std::thread::sleep(std::time::Duration::from_millis(200));
+                            }
                             let captured_text = os_integration::get_selected_text().unwrap_or_default();
                             let (mouse_x, mouse_y) = os_integration::get_mouse_position();
 
