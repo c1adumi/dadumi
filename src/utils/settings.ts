@@ -8,10 +8,13 @@ export interface ProviderSettings {
   config: Record<string, string>
 }
 
+export type Theme = "dark" | "light"
+
 export interface AppSettings {
   activeProvider: ProviderID
   systemPrompt: string
   language: Language
+  theme: Theme
   providers: Partial<Record<ProviderID, ProviderSettings>>
 }
 
@@ -43,6 +46,7 @@ export function loadSettings(): AppSettings {
     activeProvider: "bedrock",
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     language: "en",
+    theme: "dark",
     providers: { bedrock: defaultProviderSettings("bedrock") },
   }
 }
@@ -61,6 +65,7 @@ function migrateSettings(settings: AppSettings): AppSettings {
   return {
     ...settings,
     language: settings.language ?? "en",
+    theme: settings.theme ?? "dark",
     providers,
   }
 }
