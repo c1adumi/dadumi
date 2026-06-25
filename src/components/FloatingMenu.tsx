@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { invokeCmd, isTauri } from "../utils/tauriBridge";
 import { parseProviderResponse } from "../utils/providers";
 import { useSettings } from "../context/SettingsContext";
+import { PRESET_INSTRUCTIONS } from "../prompts";
 
 interface FloatingMenuProps {
   selectionText: string;
@@ -22,20 +23,18 @@ const PRESET_ICONS = {
   professional: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
   continue: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>,
 };
-const PRESET_INSTRUCTIONS = {
-  grammar: "Correct any spelling, grammatical, or punctuation errors in this text while keeping the exact meaning and tone unchanged.",
-  improve: "Improve the clarity, vocabulary, flow, and overall quality of this text. Ensure it sounds polished and natural.",
-  professional: "Rewrite this text in a professional, polite, and clear business tone, suitable for emails, Slack, and reports.",
-  continue: "Using the text below as the start, write the next 1-2 logical sentences, matching the style and flow.",
-};
 
 export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProps) {
   const {
     settings,
     activeProviderSettings,
     activeProviderDef,
+    currentSystemPrompt,
     tr,
   } = useSettings();
+
+  const lang = settings.language ?? "en";
+  const presetInstructions = PRESET_INSTRUCTIONS[lang];
 
   const [customPrompt, setCustomPrompt] = useState("");
   const [streamedText, setStreamedText] = useState("");
@@ -80,7 +79,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
       const response = await activeProviderDef.buildRequest(
         activeProviderSettings.config,
         activeProviderSettings.model,
-        settings.systemPrompt,
+        currentSystemPrompt,
         userMessage,
         abortControllerRef.current.signal,
       );
@@ -143,7 +142,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
               key={id}
               className="preset-card"
               disabled={isGenerating || !selectionText}
-              onClick={() => handleAIQuery(PRESET_INSTRUCTIONS[id])}
+              onClick={() => handleAIQuery(presetInstructions[id])}
             >
               <span className="preset-icon">{PRESET_ICONS[id]}</span>
               <span className="preset-title">{tr.presets[id]}</span>

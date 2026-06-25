@@ -39,8 +39,12 @@ if ($pkg) {
 
     if ($uninstallStr) {
         Write-Info "Running uninstaller: $uninstallStr"
-        $uninstallStr = $uninstallStr -replace '"', ''
-        Start-Process $uninstallStr -ArgumentList "/S" -Wait
+        $uninstallStr = $uninstallStr.Trim('"')
+        if ($uninstallStr -match '^(.*MsiExec\.exe)\s+(.+)$') {
+            Start-Process "msiexec.exe" -ArgumentList ($Matches[2] + " /qn") -Wait
+        } else {
+            Start-Process $uninstallStr -ArgumentList "/S" -Wait
+        }
         Write-Ok "Dadumi uninstalled"
     } else {
         Remove-IfExists "$env:LOCALAPPDATA\Programs\dadumi"

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSettings } from "../context/SettingsContext";
 import { isTauri, invokeCmd } from "../utils/tauriBridge";
-import { PROVIDERS, type ProviderID } from "../utils/providers";
+import { PROVIDERS, parseProviderResponse, type ProviderID } from "../utils/providers";
 import type { Theme } from "../utils/settings";
 import type { Language } from "../utils/i18n";
 import "../styles/index.css";
@@ -34,6 +34,7 @@ export default function SettingsWindow() {
     dynamicModels,
     isFetchingModels,
     tr,
+    currentSystemPrompt,
     setTheme,
     setActiveProvider,
     setModel,
@@ -46,10 +47,40 @@ export default function SettingsWindow() {
 
   const currentTheme = settings.theme ?? "dark";
   const availableModels = dynamicModels.length > 0 ? dynamicModels : activeProviderDef.models;
-  const [draftSystemPrompt, setDraftSystemPrompt] = useState(settings.systemPrompt);
+  const lang = settings.language ?? "en";
+  const otherLang: Language = lang === "en" ? "ko" : "en";
+
+  const [draftPrompt, setDraftPrompt] = useState(settings.systemPrompts[lang]);
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  const handleTranslate = async () => {
+    if (isTranslating || !draftPrompt) return;
+    setIsTranslating(true);
+    try {
+      const targetLangLabel = lang === "en" ? "Korean" : "English";
+      const instruction = `Translate the following system prompt to ${targetLangLabel}. Return ONLY the translated text, no explanation:\n\n${draftPrompt}`;
+
+      const response = await activeProviderDef.buildRequest(
+        activeProviderSettings.config,
+        activeProviderSettings.model,
+        currentSystemPrompt,
+        instruction,
+        new AbortController().signal,
+      );
+      if (response.ok) {
+        const translated = await parseProviderResponse(settings.activeProvider, response);
+        setSystemPrompt(draftPrompt, lang);
+        setSystemPrompt(translated, otherLang);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const handleConfirm = async () => {
-    setSystemPrompt(draftSystemPrompt);
+    setSystemPrompt(draftPrompt, lang);
     await invokeCmd("show_main_window");
     if (isTauri()) {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -67,13 +98,13 @@ export default function SettingsWindow() {
         <div className="settings-section">
           <label className="form-label">{tr.settings.language}</label>
           <div className="provider-tabs">
-            {(["en", "ko"] as Language[]).map((lang) => (
+            {(["en", "ko"] as Language[]).map((l) => (
               <button
-                key={lang}
-                className={`provider-tab ${settings.language === lang ? "active" : ""}`}
-                onClick={() => setLanguage(lang)}
+                key={l}
+                className={`provider-tab ${lang === l ? "active" : ""}`}
+                onClick={() => setLanguage(l)}
               >
-                {lang === "en" ? "English" : "한국어"}
+                {l === "en" ? "English" : "한국어"}
               </button>
             ))}
           </div>
@@ -154,13 +185,24 @@ export default function SettingsWindow() {
         ))}
 
         <div className="settings-section">
-          <label className="form-label">{tr.settings.systemPrompt}</label>
+          <label className="form-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>{tr.settings.systemPrompt} ({lang === "en" ? "EN" : "KO"})</span>
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "4px 10px", height: "auto" }}
+              onClick={handleTranslate}
+              disabled={isTranslating || !draftPrompt}
+            >
+              {isTranslating ? tr.settings.translating : tr.settings.translatePrompt}
+            </button>
+          </label>
           <textarea
             className="form-input"
-            rows={4}
-            style={{ resize: "none" }}
-            value={draftSystemPrompt}
-            onChange={(e) => setDraftSystemPrompt(e.target.value)}
+            rows={5}
+            style={{ resize: "vertical" }}
+            placeholder={tr.settings.systemPromptPlaceholder}
+            value={draftPrompt}
+            onChange={(e) => setDraftPrompt(e.target.value)}
           />
         </div>
       </div>

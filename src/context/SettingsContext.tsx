@@ -4,6 +4,7 @@ import {
   saveSettings,
   getActiveProviderSettings,
   updateProviderSettings,
+  getSystemPrompt,
   type AppSettings,
   type ProviderSettings,
   type Theme,
@@ -21,11 +22,12 @@ interface SettingsContextValue {
   setActiveProvider: (id: ProviderID) => void;
   setModel: (model: string) => void;
   setConfigField: (key: string, value: string) => void;
-  setSystemPrompt: (prompt: string) => void;
+  setSystemPrompt: (prompt: string, lang?: Language) => void;
   setLanguage: (lang: Language) => void;
   setTheme: (theme: Theme) => void;
   persistConfigField: () => void;
   refreshModels: () => void;
+  currentSystemPrompt: string;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -84,8 +86,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     fetchModels(activeProviderDef, getActiveProviderSettings(settings).config);
   }, [settings, activeProviderDef, fetchModels]);
 
-  const setSystemPrompt = useCallback((prompt: string) => {
-    persist({ ...settings, systemPrompt: prompt });
+  const setSystemPrompt = useCallback((prompt: string, lang?: Language) => {
+    const targetLang = lang ?? settings.language
+    persist({
+      ...settings,
+      systemPrompts: { ...settings.systemPrompts, [targetLang]: prompt },
+    });
   }, [settings, persist]);
 
   const setLanguage = useCallback((lang: Language) => {
@@ -132,6 +138,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setTheme,
     persistConfigField,
     refreshModels,
+    currentSystemPrompt: getSystemPrompt(settings),
   };
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

@@ -31,11 +31,16 @@ fn show_main_window(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn open_settings(app: tauri::AppHandle) {
+    show_settings_window(&app);
+}
+
+fn show_settings_window(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.show();
         let _ = win.set_focus();
     } else {
         let _ = WebviewWindowBuilder::new(
-            &app,
+            app,
             "settings",
             WebviewUrl::App("index.html?view=settings".into()),
         )
@@ -112,19 +117,7 @@ pub fn run() {
                             std::process::exit(0);
                         }
                         "settings" => {
-                            if let Some(win) = app.get_webview_window("settings") {
-                                let _ = win.set_focus();
-                            } else {
-                                let _ = WebviewWindowBuilder::new(
-                                    app,
-                                    "settings",
-                                    WebviewUrl::App("index.html?view=settings".into()),
-                                )
-                                .title("Dadumi Settings")
-                                .inner_size(420.0, 500.0)
-                                .resizable(false)
-                                .build();
-                            }
+                            show_settings_window(app);
                         }
                         "show" => {
                             let app_handle = app.clone();

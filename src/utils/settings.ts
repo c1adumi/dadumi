@@ -1,6 +1,7 @@
 import type { ProviderID } from "./providers"
 import { PROVIDERS } from "./providers"
 import type { Language } from "./i18n"
+import { DEFAULT_PROMPTS } from "../prompts"
 
 export interface ProviderSettings {
   providerId: ProviderID
@@ -12,7 +13,7 @@ export type Theme = "dark" | "light"
 
 export interface AppSettings {
   activeProvider: ProviderID
-  systemPrompt: string
+  systemPrompts: Record<Language, string>
   language: Language
   theme: Theme
   providers: Partial<Record<ProviderID, ProviderSettings>>
@@ -20,8 +21,15 @@ export interface AppSettings {
 
 const STORAGE_KEY = "dadumi_settings"
 
-const DEFAULT_SYSTEM_PROMPT =
-  "You are a helpful writing assistant. Respond ONLY with the requested text edit or completion, without any intro, outro, explanations, markdown code blocks, or conversational filler."
+function defaultSettings(): AppSettings {
+  return {
+    activeProvider: "bedrock",
+    systemPrompts: { en: DEFAULT_PROMPTS.en, ko: DEFAULT_PROMPTS.ko },
+    language: "en",
+    theme: "dark",
+    providers: { bedrock: defaultProviderSettings("bedrock") },
+  }
+}
 
 function defaultProviderSettings(providerId: ProviderID): ProviderSettings {
   const def = PROVIDERS.find((p) => p.id === providerId)!
@@ -42,13 +50,7 @@ export function loadSettings(): AppSettings {
   } catch {
     // corrupt storage — fall through to defaults
   }
-  return {
-    activeProvider: "bedrock",
-    systemPrompt: DEFAULT_SYSTEM_PROMPT,
-    language: "en",
-    theme: "dark",
-    providers: { bedrock: defaultProviderSettings("bedrock") },
-  }
+  return defaultSettings()
 }
 
 function migrateSettings(settings: AppSettings): AppSettings {
@@ -62,12 +64,22 @@ function migrateSettings(settings: AppSettings): AppSettings {
       providers[id as ProviderID] = { ...providerSettings, model: def.models[0]?.id ?? "" }
     }
   }
+  const defaults = defaultSettings()
+  const systemPrompts: Record<Language, string> = {
+    en: (settings as any).systemPrompts?.en ?? (settings as any).systemPrompt ?? defaults.systemPrompts.en,
+    ko: (settings as any).systemPrompts?.ko ?? defaults.systemPrompts.ko,
+  }
   return {
     ...settings,
+    systemPrompts,
     language: settings.language ?? "en",
     theme: settings.theme ?? "dark",
     providers,
   }
+}
+
+export function getSystemPrompt(settings: AppSettings): string {
+  return settings.systemPrompts[settings.language] ?? settings.systemPrompts.en
 }
 
 export function saveSettings(settings: AppSettings): void {
