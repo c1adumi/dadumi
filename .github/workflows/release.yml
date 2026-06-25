@@ -71,14 +71,37 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-      - name: Re-sign macOS app with entitlements (ad-hoc)
+      - name: Re-sign and repackage macOS DMG with entitlements
         if: matrix.platform == 'macos-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
         run: |
           APP=$(find src-tauri/target -name "Dadumi.app" -type d | head -1)
-          if [ -n "$APP" ]; then
-            codesign --force --deep --sign - \
-              --entitlements src-tauri/Entitlements.plist \
-              --options runtime \
-              "$APP"
-            echo "Re-signed: $APP"
+          [ -z "$APP" ] && echo "Dadumi.app not found" && exit 1
+
+          codesign --force --deep --sign - \
+            --entitlements src-tauri/Entitlements.plist \
+            "$APP"
+          echo "Re-signed: $APP"
+
+          codesign -dv --entitlements - "$APP" 2>&1
+
+          VERSION=$(defaults read "$(pwd)/$APP/Contents/Info.plist" CFBundleShortVersionString)
+          DMG_NAME="Dadumi_${VERSION}_aarch64.dmg"
+          DMG_PATH="$(dirname "$APP")/$DMG_NAME"
+
+          hdiutil create -volname "Dadumi" \
+            -srcfolder "$APP" \
+            -ov -format UDZO \
+            "$DMG_PATH"
+          echo "Created DMG: $DMG_PATH"
+
+          OLD_DMG=$(gh release view "$TAG" --json assets --jq '.assets[].name' | grep "_aarch64.dmg" || true)
+          if [ -n "$OLD_DMG" ]; then
+            gh release delete-asset "$TAG" "$OLD_DMG" --yes 2>/dev/null || true
           fi
+
+          gh release upload "$TAG" "$DMG_PATH" --clobber
+          echo "Uploaded: $DMG_NAME"
+
