@@ -67,16 +67,7 @@ fn show_settings_window(app: &tauri::AppHandle) {
     };
 
     let win_clone = win.clone();
-    let app_clone = app.clone();
-    win.on_webview_event(move |event| {
-        if let tauri::WebviewEvent::DomReady = event {
-            SETTINGS_OPENING.store(false, Ordering::SeqCst);
-            let _ = win_clone.show();
-            let _ = win_clone.set_focus();
-        }
-    });
-
-    let app_for_close = app_clone.clone();
+    let app_for_close = app.clone();
     win.on_window_event(move |event| {
         match event {
             tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed => {
@@ -87,6 +78,13 @@ fn show_settings_window(app: &tauri::AppHandle) {
             }
             _ => {}
         }
+    });
+
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        SETTINGS_OPENING.store(false, Ordering::SeqCst);
+        let _ = win_clone.show();
+        let _ = win_clone.set_focus();
     });
 }
 
