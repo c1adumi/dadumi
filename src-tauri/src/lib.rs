@@ -1,4 +1,4 @@
-use tauri::{Manager, Emitter};
+use tauri::{Manager, Emitter, WebviewWindowBuilder, WebviewUrl};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, GlobalShortcutExt};
@@ -19,6 +19,31 @@ struct CaretPosition {
 #[tauri::command]
 fn hide_window(window: tauri::WebviewWindow) {
     let _ = window.hide();
+}
+
+#[tauri::command]
+fn show_main_window(app: tauri::AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+#[tauri::command]
+fn open_settings(app: tauri::AppHandle) {
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.set_focus();
+    } else {
+        let _ = WebviewWindowBuilder::new(
+            &app,
+            "settings",
+            WebviewUrl::App("index.html?view=settings".into()),
+        )
+        .title("Dadumi Settings")
+        .inner_size(420.0, 500.0)
+        .resizable(false)
+        .build();
+    }
 }
 
 #[tauri::command]
@@ -72,8 +97,9 @@ pub fn run() {
             os_integration::request_accessibility_if_needed();
 
             let show_i = MenuItemBuilder::with_id("show", "Show Assistant").build(app)?;
+            let settings_i = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
             let quit_i = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
-            let menu = MenuBuilder::new(app).items(&[&show_i, &quit_i]).build()?;
+            let menu = MenuBuilder::new(app).items(&[&show_i, &settings_i, &quit_i]).build()?;
 
             // Build tray icon
             let _tray = TrayIconBuilder::new()
@@ -83,6 +109,21 @@ pub fn run() {
                     match event.id().as_ref() {
                         "quit" => {
                             app.exit(0);
+                        }
+                        "settings" => {
+                            if let Some(win) = app.get_webview_window("settings") {
+                                let _ = win.set_focus();
+                            } else {
+                                let _ = WebviewWindowBuilder::new(
+                                    app,
+                                    "settings",
+                                    WebviewUrl::App("index.html?view=settings".into()),
+                                )
+                                .title("Dadumi Settings")
+                                .inner_size(420.0, 500.0)
+                                .resizable(false)
+                                .build();
+                            }
                         }
                         "show" => {
                             let app_handle = app.clone();
@@ -125,6 +166,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             hide_window,
+            show_main_window,
+            open_settings,
             paste_text,
             get_caret_position
         ])
