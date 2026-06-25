@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invokeCmd, isTauri } from "../utils/tauriBridge";
-import { PROVIDERS, parseProviderResponse, type ProviderID } from "../utils/providers";
+import { parseProviderResponse } from "../utils/providers";
 import { useSettings } from "../context/SettingsContext";
-import type { Language } from "../utils/i18n";
 
 interface FloatingMenuProps {
   selectionText: string;
@@ -35,31 +34,13 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
     settings,
     activeProviderSettings,
     activeProviderDef,
-    dynamicModels,
-    isFetchingModels,
     tr,
-    setActiveProvider,
-    setModel,
-    setConfigField,
-    setSystemPrompt,
-    setLanguage,
-    persistConfigField,
-    refreshModels,
   } = useSettings();
-
-  const availableModels = dynamicModels.length > 0 ? dynamicModels : activeProviderDef.models;
 
   const [customPrompt, setCustomPrompt] = useState("");
   const [streamedText, setStreamedText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [draftSystemPrompt, setDraftSystemPrompt] = useState(settings.systemPrompt);
-  const [draftLanguage, setDraftLanguage] = useState<Language>(settings.language ?? "en");
-
-  useEffect(() => {
-    setDraftSystemPrompt(settings.systemPrompt);
-  }, [settings.systemPrompt]);
 
   const streamEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -145,10 +126,8 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
     });
   };
 
-  const handleConfirmSettings = () => {
-    setSystemPrompt(draftSystemPrompt);
-    setLanguage(draftLanguage);
-    setShowSettings(false);
+  const handleOpenSettings = async () => {
+    await invokeCmd("open_settings");
   };
 
   return (
@@ -170,16 +149,6 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
               <span className="preset-title">{tr.presets[id]}</span>
             </button>
           ))}
-
-          <button className="preset-card" disabled={isGenerating} onClick={() => setShowSettings(true)}>
-            <span className="preset-icon"><IconGear /></span>
-            <span className="preset-title" style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-              {tr.main.configureSettings}
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 400 }}>
-                {activeProviderDef.label}
-              </span>
-            </span>
-          </button>
         </section>
 
         <div className="menu-separator" />
@@ -224,6 +193,9 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
       </main>
 
       <footer className="footer-bar">
+        <button className="icon-btn" onClick={handleOpenSettings} style={{ marginRight: "auto" }}>
+          <IconGear />
+        </button>
         {isGenerating ? (
           <button className="btn btn-secondary" onClick={handleStop}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><rect width="6" height="6" x="9" y="9" rx="1"/></svg>
@@ -245,113 +217,6 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
           </>
         )}
       </footer>
-
-      <section className={`settings-panel ${showSettings ? "open" : ""}`}>
-        <div className="settings-header">
-          <div className="settings-title">
-            <IconGear />
-            {tr.settings.title}
-          </div>
-          <button className="icon-btn" onClick={handleConfirmSettings} aria-label="Back">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-          </button>
-        </div>
-
-        <div className="settings-body">
-          <div className="form-group">
-            <label className="form-label">{tr.settings.language}</label>
-            <div className="provider-tabs">
-              {(["en", "ko"] as Language[]).map((lang) => (
-                <button
-                  key={lang}
-                  className={`provider-tab ${draftLanguage === lang ? "active" : ""}`}
-                  onClick={() => setDraftLanguage(lang)}
-                >
-                  {lang === "en" ? "English" : "한국어"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">{tr.settings.provider}</label>
-            <div className="provider-tabs">
-              {PROVIDERS.map((p) => (
-                <button
-                  key={p.id}
-                  className={`provider-tab ${settings.activeProvider === p.id ? "active" : ""}`}
-                  onClick={() => setActiveProvider(p.id as ProviderID)}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="modelSelect">
-              {tr.settings.model}
-              {activeProviderDef.fetchModels && (
-                <button
-                  className="icon-btn"
-                  style={{ marginLeft: "auto", width: 20, height: 20 }}
-                  onClick={refreshModels}
-                  disabled={isFetchingModels}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: isFetchingModels ? "spin 1s linear infinite" : "none" }}><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-                </button>
-              )}
-            </label>
-            <select
-              id="modelSelect"
-              className="form-select"
-              value={activeProviderSettings.model}
-              onChange={(e) => setModel(e.target.value)}
-              disabled={isFetchingModels}
-            >
-              {isFetchingModels
-                ? <option>{tr.settings.loadingModels}</option>
-                : availableModels.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))
-              }
-            </select>
-          </div>
-
-          {activeProviderDef.fields.map((field) => (
-            <div key={field.key} className="form-group">
-              <label className="form-label" htmlFor={`field-${field.key}`}>{field.label}</label>
-              <input
-                id={`field-${field.key}`}
-                type={field.type === "password" ? "password" : "text"}
-                className="form-input"
-                placeholder={field.placeholder}
-                value={activeProviderSettings.config[field.key] ?? field.defaultValue ?? ""}
-                onChange={(e) => setConfigField(field.key, e.target.value)}
-                onBlur={persistConfigField}
-              />
-            </div>
-          ))}
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="systemPromptInput">{tr.settings.systemPrompt}</label>
-            <textarea
-              id="systemPromptInput"
-              className="form-input"
-              rows={4}
-              style={{ resize: "none" }}
-              value={draftSystemPrompt}
-              onChange={(e) => setDraftSystemPrompt(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="settings-footer">
-          <button className="btn btn-confirm" onClick={handleConfirmSettings}>
-            {tr.settings.confirm}
-          </button>
-        </div>
-      </section>
     </div>
   );
 }
