@@ -1,22 +1,14 @@
-// Tauri Bridge to support browser preview fallback
-
-const isTauriVal = typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__ !== undefined;
-
-// Registry for mock event listeners
 const mockListeners: { [eventName: string]: ((event: { payload: any }) => void)[] } = {};
 
-/**
- * Checks if the application is running inside a Tauri container.
- */
 export function isTauri(): boolean {
-  return isTauriVal;
+  return typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__ !== undefined;
 }
 
 /**
  * Invokes a Tauri IPC command, falling back to mock implementation in the browser.
  */
 export async function invokeCmd(command: string, args?: any): Promise<any> {
-  if (isTauriVal) {
+  if (isTauri()) {
     const { invoke } = await import("@tauri-apps/api/core");
     return invoke(command, args).catch((err: any) => {
       console.error(`[Tauri] Command "${command}" failed:`, err);
@@ -49,7 +41,7 @@ export async function listenEvent(
   eventName: string,
   handler: (payload: any) => void
 ): Promise<() => void> {
-  if (isTauriVal) {
+  if (isTauri()) {
     const { listen } = await import("@tauri-apps/api/event");
     return listen(eventName, (event: any) => {
       handler(event.payload);
@@ -76,7 +68,7 @@ export async function listenEvent(
  * Triggers a mock event in the browser. Used by the simulator overlay.
  */
 export function triggerMockEvent(eventName: string, payload: any) {
-  if (isTauriVal) return;
+  if (isTauri()) return;
   console.log(`[Tauri Mock] Triggering event "${eventName}" with payload:`, payload);
   const listeners = mockListeners[eventName] || [];
   listeners.forEach((handler) => handler({ payload }));

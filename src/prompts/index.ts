@@ -9,11 +9,13 @@ export const PRESET_INSTRUCTIONS = {
     improve: "Improve the clarity, vocabulary, flow, and overall quality of this text. Ensure it sounds polished and natural.",
     professional: "Rewrite this text in a professional, polite, and clear business tone, suitable for emails, Slack, and reports.",
     continue: "Using the text below as the start, write the next 1-2 logical sentences, matching the style and flow.",
+    translate: "Translate the following text into Korean. Return ONLY the translated text.",
   },
   ko: {
     grammar: "이 텍스트의 맞춤법, 문법, 구두점 오류를 수정하되 의미와 어조는 그대로 유지하세요.",
     improve: "이 텍스트의 명확성, 어휘, 흐름, 전반적인 품질을 개선하세요. 자연스럽고 세련된 문체로 작성해주세요.",
     professional: "이 텍스트를 이메일, 슬랙, 보고서에 적합한 전문적이고 정중하며 명확한 비즈니스 문체로 다시 작성하세요.",
     continue: "아래 텍스트를 시작으로, 같은 스타일과 흐름에 맞게 자연스러운 다음 문장 1-2개를 이어 작성하세요.",
+    translate: "다음 텍스트를 영어로 번역하세요. 번역된 텍스트만 반환하세요.",
   },
 } as const

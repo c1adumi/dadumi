@@ -16,12 +16,13 @@ const IconGear = () => (
   </svg>
 );
 
-const PRESET_IDS = ["grammar", "improve", "professional", "continue"] as const;
+const PRESET_IDS = ["grammar", "improve", "professional", "continue", "translate"] as const;
 const PRESET_ICONS = {
   grammar: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>,
   improve: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/></svg>,
   professional: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
   continue: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>,
+  translate: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>,
 };
 
 export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProps) {
@@ -112,7 +113,10 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
       await invokeCmd("paste_text", { text: finalResult });
       onHide();
     } catch (err: any) {
-      setStreamedText((prev) => prev + `\n\n⚠️ Paste failed: ${err}. Check Accessibility permission in System Settings → Privacy & Security → Accessibility.`);
+      const hint = navigator.userAgent.includes("Windows")
+        ? "Ensure Dadumi is not running as Administrator if the target app is not elevated."
+        : "Check Accessibility permission in System Settings → Privacy & Security → Accessibility.";
+      setStreamedText((prev) => prev + `\n\n⚠️ Paste failed: ${err}. ${hint}`);
     }
   };
 

@@ -13,7 +13,12 @@ $release = Invoke-RestMethod "https://api.github.com/repos/$REPO/releases/latest
 $version = $release.tag_name
 Write-Info "Latest version: $version"
 
-$arch = if ([System.Environment]::Is64BitOperatingSystem) { "x64" } else { Write-Fail "32-bit Windows is not supported." }
+$cpuArch = (Get-CimInstance Win32_Processor -Property Architecture | Select-Object -First 1).Architecture
+$arch = switch ($cpuArch) {
+    9  { "x64" }
+    12 { "arm64" }
+    default { Write-Fail "Unsupported architecture: $cpuArch" }
+}
 
 $asset = $release.assets | Where-Object { $_.name -like "*_${arch}_en-US.msi" } | Select-Object -First 1
 if (-not $asset) {
@@ -27,10 +32,19 @@ Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tmpFile -UseBasicPa
 
 if ($tmpFile -like "*.msi") {
     Write-Info "Installing .msi package..."
-    Start-Process msiexec.exe -ArgumentList "/i `"$tmpFile`" /quiet /norestart" -Wait
+    $proc = Start-Process msiexec.exe -ArgumentList "/i `"$tmpFile`" /quiet /norestart" -Wait -PassThru
+    if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne 3010) {
+        Write-Fail "MSI installation failed with exit code $($proc.ExitCode)"
+    }
+    if ($proc.ExitCode -eq 3010) {
+        Write-Info "Installation succeeded. A reboot may be required."
+    }
 } else {
     Write-Info "Running installer..."
-    Start-Process $tmpFile -ArgumentList "/S" -Wait
+    $proc = Start-Process $tmpFile -ArgumentList "/S" -Wait -PassThru
+    if ($proc.ExitCode -ne 0) {
+        Write-Fail "Installer failed with exit code $($proc.ExitCode)"
+    }
 }
 
 Remove-Item $tmpFile -Force

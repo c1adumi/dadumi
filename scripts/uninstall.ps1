@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 
 function Write-Info { Write-Host "==> $args" -ForegroundColor Blue }
 function Write-Ok   { Write-Host "✓  $args" -ForegroundColor Green }
+function Write-Warn { Write-Host "⚠  $args" -ForegroundColor Yellow }
 
 function Remove-IfExists($path) {
     if (Test-Path $path) {
@@ -20,47 +21,46 @@ if ($proc) {
     Start-Sleep -Seconds 1
 }
 
-$pkg = Get-Package -Name "Dadumi" -ErrorAction SilentlyContinue
-if ($pkg) {
-    $pkg | Uninstall-Package -Force
-    Write-Ok "Dadumi uninstalled via package manager"
-} else {
-    $regPaths = @(
-        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
-    )
-    $uninstallStr = $null
-    foreach ($rp in $regPaths) {
-        $entry = Get-ItemProperty $rp -ErrorAction SilentlyContinue |
-                 Where-Object { $_.DisplayName -like "Dadumi*" } |
-                 Select-Object -First 1
-        if ($entry) { $uninstallStr = $entry.UninstallString; break }
-    }
+$regPaths = @(
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
+)
+$uninstallStr = $null
+foreach ($rp in $regPaths) {
+    $entry = Get-ItemProperty $rp -ErrorAction SilentlyContinue |
+             Where-Object { $_.DisplayName -like "Dadumi*" } |
+             Select-Object -First 1
+    if ($entry) { $uninstallStr = $entry.UninstallString; break }
+}
 
-    if ($uninstallStr) {
-        Write-Info "Running uninstaller: $uninstallStr"
-        $uninstallStr = $uninstallStr.Trim('"')
-        if ($uninstallStr -match '^(.*MsiExec\.exe)\s+(.+)$') {
-            Start-Process "msiexec.exe" -ArgumentList ($Matches[2] + " /qn") -Wait
-        } else {
-            Start-Process $uninstallStr -ArgumentList "/S" -Wait
+if ($uninstallStr) {
+    Write-Info "Running uninstaller: $uninstallStr"
+    if ($uninstallStr -match '(?i)MsiExec\.exe\s+(/[IX]\{[^}]+\})') {
+        $proc = Start-Process "msiexec.exe" -ArgumentList "/x $($Matches[1]) /qn /norestart" -Wait -PassThru
+        if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne 3010) {
+            Write-Warn "Uninstaller exited with code $($proc.ExitCode)"
         }
-        Write-Ok "Dadumi uninstalled"
     } else {
-        Remove-IfExists "$env:LOCALAPPDATA\Programs\dadumi"
-        Remove-IfExists "$env:LOCALAPPDATA\Programs\Dadumi"
-        Write-Ok "Dadumi installation files removed"
+        $exePath = ($uninstallStr -replace '"', '').Trim()
+        if (Test-Path $exePath) {
+            Start-Process $exePath -ArgumentList "/S" -Wait
+        }
     }
+    Write-Ok "Dadumi uninstalled"
+} else {
+    Remove-IfExists "$env:LOCALAPPDATA\Programs\dadumi"
+    Remove-IfExists "$env:LOCALAPPDATA\Programs\Dadumi"
+    Write-Ok "Dadumi installation files removed"
 }
 
 $dataPaths = @(
+    "$env:APPDATA\com.gayeonlee.dadumi",
+    "$env:LOCALAPPDATA\com.gayeonlee.dadumi",
+    "$env:LOCALAPPDATA\com.gayeonlee.dadumi\EBWebView",
     "$env:APPDATA\dadumi",
     "$env:APPDATA\Dadumi",
-    "$env:APPDATA\com.gayeonlee.dadumi",
     "$env:LOCALAPPDATA\dadumi",
     "$env:LOCALAPPDATA\Dadumi",
-    "$env:LOCALAPPDATA\com.gayeonlee.dadumi",
-    "$env:LOCALAPPDATA\dadumi\EBWebView",
     "$env:TEMP\dadumi*"
 )
 foreach ($path in $dataPaths) {
@@ -74,4 +74,4 @@ foreach ($path in $dataPaths) {
     }
 }
 
-Write-Ok "Dadumi fully removed — no files left behind"
+Write-Ok "Dadumi fully removed"

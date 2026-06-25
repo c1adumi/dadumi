@@ -7,6 +7,7 @@ export const translations = {
       improve: "Improve Writing",
       professional: "Professional Tone",
       continue: "Continue Writing",
+      translate: "Translate to Korean",
     },
     settings: {
       title: "Configuration",
@@ -36,6 +37,7 @@ export const translations = {
       improve: "글 다듬기",
       professional: "전문적 말투",
       continue: "이어 쓰기",
+      translate: "영어로 번역",
     },
     settings: {
       title: "설정",
