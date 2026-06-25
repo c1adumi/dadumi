@@ -108,7 +108,8 @@ pub fn run() {
                 .on_menu_event(|app, event| {
                     match event.id().as_ref() {
                         "quit" => {
-                            app.exit(0);
+                            app.cleanup_before_exit();
+                            std::process::exit(0);
                         }
                         "settings" => {
                             if let Some(win) = app.get_webview_window("settings") {

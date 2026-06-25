@@ -33,18 +33,41 @@ extern "C" {
 
 pub fn request_accessibility_if_needed() {
     unsafe {
-        let cls = objc::runtime::Class::get("NSDictionary").unwrap();
-        let key: *mut objc::runtime::Object = msg_send![
-            objc::runtime::Class::get("NSString").unwrap(),
-            stringWithUTF8String: b"AXTrustedCheckOptionPrompt\0".as_ptr()
-        ];
-        let val: *mut objc::runtime::Object = msg_send![
-            objc::runtime::Class::get("NSNumber").unwrap(),
-            numberWithBool: objc::runtime::YES
-        ];
-        let options: *mut objc::runtime::Object =
-            msg_send![cls, dictionaryWithObject: val forKey: key];
-        AXIsProcessTrustedWithOptions(options as *const std::ffi::c_void);
+        let trusted: bool = {
+            let cls_dict = objc::runtime::Class::get("NSDictionary").unwrap();
+            let key: *mut objc::runtime::Object = msg_send![
+                objc::runtime::Class::get("NSString").unwrap(),
+                stringWithUTF8String: b"AXTrustedCheckOptionPrompt\0".as_ptr()
+            ];
+            let val_no: *mut objc::runtime::Object = msg_send![
+                objc::runtime::Class::get("NSNumber").unwrap(),
+                numberWithBool: objc::runtime::NO
+            ];
+            let opts_check: *mut objc::runtime::Object =
+                msg_send![cls_dict, dictionaryWithObject: val_no forKey: key];
+            AXIsProcessTrustedWithOptions(opts_check as *const std::ffi::c_void)
+        };
+
+        if !trusted {
+            let _ = std::process::Command::new("tccutil")
+                .args(["reset", "Accessibility", "com.gayeonlee.dadumi"])
+                .output();
+
+            thread::sleep(Duration::from_millis(200));
+
+            let cls_dict = objc::runtime::Class::get("NSDictionary").unwrap();
+            let key: *mut objc::runtime::Object = msg_send![
+                objc::runtime::Class::get("NSString").unwrap(),
+                stringWithUTF8String: b"AXTrustedCheckOptionPrompt\0".as_ptr()
+            ];
+            let val_yes: *mut objc::runtime::Object = msg_send![
+                objc::runtime::Class::get("NSNumber").unwrap(),
+                numberWithBool: objc::runtime::YES
+            ];
+            let opts_prompt: *mut objc::runtime::Object =
+                msg_send![cls_dict, dictionaryWithObject: val_yes forKey: key];
+            AXIsProcessTrustedWithOptions(opts_prompt as *const std::ffi::c_void);
+        }
     }
 }
 
