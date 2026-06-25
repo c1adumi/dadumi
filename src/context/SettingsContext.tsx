@@ -6,6 +6,7 @@ import {
   updateProviderSettings,
   type AppSettings,
   type ProviderSettings,
+  type Theme,
 } from "../utils/settings";
 import { getProvider, type ProviderID, type ProviderDef, type ModelDef } from "../utils/providers";
 import { t, type Language, type T } from "../utils/i18n";
@@ -22,6 +23,7 @@ interface SettingsContextValue {
   setConfigField: (key: string, value: string) => void;
   setSystemPrompt: (prompt: string) => void;
   setLanguage: (lang: Language) => void;
+  setTheme: (theme: Theme) => void;
   persistConfigField: () => void;
   refreshModels: () => void;
 }
@@ -90,6 +92,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     persist({ ...settings, language: lang });
   }, [settings, persist]);
 
+  const setTheme = useCallback((theme: Theme) => {
+    persist({ ...settings, theme });
+  }, [settings, persist]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme ?? "dark";
+  }, [settings.theme]);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "dadumi_settings" && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue) as AppSettings;
+          setSettings(updated);
+        } catch { /* ignore corrupt */ }
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const refreshModels = useCallback(() => {
     fetchModels(activeProviderDef, activeProviderSettings.config);
   }, [activeProviderDef, activeProviderSettings, fetchModels]);
@@ -106,6 +129,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setConfigField,
     setSystemPrompt,
     setLanguage,
+    setTheme,
     persistConfigField,
     refreshModels,
   };
