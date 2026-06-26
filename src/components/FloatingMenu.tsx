@@ -7,6 +7,8 @@ import { PRESET_INSTRUCTIONS } from "../prompts";
 interface FloatingMenuProps {
   selectionText: string;
   onHide: () => void;
+  initialPreset: PresetID;
+  onPresetChange: (preset: PresetID) => void;
 }
 
 const IconGear = () => (
@@ -17,6 +19,8 @@ const IconGear = () => (
 );
 
 const PRESET_IDS = ["grammar", "improve", "professional", "continue", "translate"] as const;
+export type PresetID = typeof PRESET_IDS[number];
+
 const PRESET_ICONS = {
   grammar: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>,
   improve: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/></svg>,
@@ -25,7 +29,7 @@ const PRESET_ICONS = {
   translate: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>,
 };
 
-export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProps) {
+export default function FloatingMenu({ selectionText, onHide, initialPreset, onPresetChange }: FloatingMenuProps) {
   const {
     settings,
     activeProviderSettings,
@@ -41,22 +45,10 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
   const [streamedText, setStreamedText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [dragReady, setDragReady] = useState(false);
 
   const streamEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  const handleDragStart = async (e: React.MouseEvent) => {
-    if (e.button !== 0 || !isTauri()) return;
-    e.preventDefault();
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    getCurrentWindow().startDragging();
-  };
-
-  useEffect(() => {
-    if (streamEndRef.current) {
-      streamEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [streamedText]);
 
   const handleAIQuery = async (instruction: string) => {
     if (isGenerating) return;
@@ -106,6 +98,31 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
     setIsGenerating(false);
   };
 
+  useEffect(() => {
+    if (selectionText) {
+      handleAIQuery(presetInstructions[initialPreset]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleDragStart = async (e: React.MouseEvent) => {
+    if (e.button !== 0 || !isTauri() || !dragReady) return;
+    e.preventDefault();
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    getCurrentWindow().startDragging();
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => setDragReady(true), 300);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (streamEndRef.current) {
+      streamEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [streamedText]);
+
   const handlePasteBack = async () => {
     const finalResult = streamedText || selectionText;
     if (!finalResult) return;
@@ -122,6 +139,22 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
       setStreamedText((prev) => prev + `\n\n⚠️ Paste failed: ${err}. ${hint}`);
     }
   };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const shortcutKey = settings.insertShortcutKey ?? "Enter";
+      const modifierHeld = isMac ? e.metaKey : e.ctrlKey;
+      const keyMatches = shortcutKey === "Space"
+        ? e.code === "Space"
+        : e.key === shortcutKey;
+      if (!modifierHeld || !keyMatches || isGenerating) return;
+      e.preventDefault();
+      handlePasteBack();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isGenerating, streamedText, selectionText, settings.insertShortcutKey]);
 
   const handleCopyToClipboard = () => {
     const finalResult = streamedText || selectionText;
@@ -149,7 +182,7 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
               key={id}
               className="preset-card"
               disabled={isGenerating || !selectionText}
-              onClick={() => handleAIQuery(presetInstructions[id])}
+              onClick={() => { onPresetChange(id); handleAIQuery(presetInstructions[id]); }}
             >
               <span className="preset-icon">{PRESET_ICONS[id]}</span>
               <span className="preset-title">{tr.presets[id]}</span>
@@ -218,7 +251,11 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
             </button>
             <button className="btn btn-primary" onClick={handlePasteBack} disabled={!streamedText && !selectionText}>
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="m17 5-5-3-5 3"/><path d="m7 19 5 3 5-3"/></svg>
-              {tr.main.insertReplace}
+              <span className="btn-insert-label">
+                {tr.main.insertReplace.split("\n").map((line, i) => (
+                  <span key={i}>{line}</span>
+                ))}
+              </span>
             </button>
           </>
         )}
