@@ -23,6 +23,20 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "shadow": false
+      },
+      {
+        "label": "settings",
+        "title": "Dadumi Settings",
+        "url": "index.html#/settings",
+        "width": 420,
+        "height": 500,
+        "decorations": true,
+        "transparent": false,
+        "visible": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": false,
+        "center": true
       }
     ],
     "security": {

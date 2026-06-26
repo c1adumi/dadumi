@@ -21,7 +21,16 @@ function App() {
     const setupTauriListener = async () => {
       unsubscribe = await listenEvent("selection-captured", (payload: any) => {
         if (payload) {
-          setSelectionText(payload.text || "");
+          const text = payload.text || "";
+          const source = payload.source || "hotkey";
+
+          // Hotkey opens only when there is an actual text selection.
+          if (source === "hotkey" && text.trim().length === 0) {
+            setIsOpen(false);
+            return;
+          }
+
+          setSelectionText(text);
           setIsOpen(true);
         }
       });

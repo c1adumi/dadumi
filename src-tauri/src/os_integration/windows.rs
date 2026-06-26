@@ -9,12 +9,32 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
-    VK_C, VK_V, VK_CONTROL, VK_MENU,
+    VK_C, VK_V, VK_CONTROL, VK_INSERT, VK_SHIFT, VK_ESCAPE,
 };
 use windows_sys::Win32::System::Threading::{GetCurrentProcessId, OpenProcessToken, GetCurrentProcess};
 use windows_sys::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
 
 static SOURCE_HWND: AtomicIsize = AtomicIsize::new(0);
+
+fn is_source_foreground() -> bool {
+    unsafe {
+        let src = SOURCE_HWND.load(Ordering::Acquire) as windows_sys::Win32::Foundation::HWND;
+        src != 0 && GetForegroundWindow() == src
+    }
+}
+
+fn get_clipboard_text_once() -> Option<String> {
+    let mut clipboard = Clipboard::new().ok()?;
+    clipboard.get_text().ok()
+}
+
+fn set_clipboard_text_once(text: String) -> bool {
+    let mut clipboard = match Clipboard::new() {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    clipboard.set_text(text).is_ok()
+}
 
 pub fn get_mouse_position() -> (f64, f64) {
     unsafe {
@@ -42,12 +62,23 @@ fn kbd_input(vk: u16, flags: u32) -> INPUT {
     }
 }
 
-fn simulate_ctrl_key(vk: u16) -> bool {
+fn press_key(vk: u16) -> bool {
+    let inputs = [
+        kbd_input(vk, 0),
+        kbd_input(vk, KEYEVENTF_KEYUP),
+    ];
+
     unsafe {
-        let alt_up = kbd_input(VK_MENU, KEYEVENTF_KEYUP);
-        SendInput(1, &alt_up, std::mem::size_of::<INPUT>() as i32);
-        thread::sleep(Duration::from_millis(10));
+        let sent = SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            std::mem::size_of::<INPUT>() as i32,
+        );
+        sent == inputs.len() as u32
     }
+}
+
+fn simulate_ctrl_key(vk: u16) -> bool {
     let inputs = [
         kbd_input(VK_CONTROL, 0),
         kbd_input(vk, 0),
@@ -64,29 +95,90 @@ fn simulate_ctrl_key(vk: u16) -> bool {
     }
 }
 
+fn simulate_shift_insert() -> bool {
+    let inputs = [
+        kbd_input(VK_SHIFT, 0),
+        kbd_input(VK_INSERT, 0),
+        kbd_input(VK_INSERT, KEYEVENTF_KEYUP),
+        kbd_input(VK_SHIFT, KEYEVENTF_KEYUP),
+    ];
+
+    unsafe {
+        let sent = SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            std::mem::size_of::<INPUT>() as i32,
+        );
+        sent == inputs.len() as u32
+    }
+}
+
+fn try_read_copied_text(sentinel: &str, use_sentinel: bool, original: &Option<String>) -> Option<String> {
+    (0..12).find_map(|_| {
+        thread::sleep(Duration::from_millis(50));
+        let text = get_clipboard_text_once()?;
+        if text.is_empty() {
+            return None;
+        }
+        if use_sentinel {
+            if text == sentinel {
+                return None;
+            }
+            return Some(text);
+        }
+
+        // If we couldn't write a sentinel, treat unchanged clipboard content
+        // as a failed copy (prevents false positives when nothing is selected).
+        if let Some(orig) = original {
+            if &text == orig {
+                return None;
+            }
+        }
+
+        Some(text)
+    })
+}
+
 pub fn get_selected_text() -> Option<String> {
-    let mut clipboard = Clipboard::new().ok()?;
-    let original = clipboard.get_text().ok();
+    let original = get_clipboard_text_once();
 
     let sentinel = "__dadumi_sentinel__";
-    let _ = clipboard.set_text(sentinel.to_string());
+    let sentinel_set = set_clipboard_text_once(sentinel.to_string());
 
+    // Alt+Space often leaves a menu focused (especially in Notepad).
+    // Dismiss menu focus before copy so Ctrl+C targets selected text.
+    let _ = press_key(VK_ESCAPE);
+    thread::sleep(Duration::from_millis(25));
+
+    // Primary path: Ctrl+C
     simulate_ctrl_key(VK_C);
+    let mut copied = try_read_copied_text(sentinel, sentinel_set, &original);
 
-    let copied = (0..8).find_map(|_| {
-        thread::sleep(Duration::from_millis(50));
-        clipboard.get_text().ok().filter(|s| s != sentinel && !s.is_empty())
-    });
+    // Notepad fallback: Ctrl+Insert often works when Ctrl+C is swallowed.
+    if copied.is_none() {
+        simulate_ctrl_key(VK_INSERT);
+        copied = try_read_copied_text(sentinel, sentinel_set, &original);
+    }
 
-    match &original {
-        Some(orig) if orig != sentinel => { let _ = clipboard.set_text(orig.clone()); }
-        _ => {}
+    if sentinel_set {
+        match &original {
+            Some(orig) if orig != sentinel => { let _ = set_clipboard_text_once(orig.clone()); }
+            _ => {}
+        }
     }
 
     copied
 }
 
 pub fn paste_text(text: String) -> bool {
+    // Paste only when the original target window is actually focused.
+    // If focus did not return, report failure so upper-layer retries can run.
+    restore_source_app();
+    thread::sleep(Duration::from_millis(80));
+    if !is_source_foreground() {
+        return false;
+    }
+
     let mut clipboard = match Clipboard::new() {
         Ok(c) => c,
         Err(_) => return false,
@@ -99,14 +191,20 @@ pub fn paste_text(text: String) -> bool {
     }
 
     thread::sleep(Duration::from_millis(50));
-    simulate_ctrl_key(VK_V);
-    thread::sleep(Duration::from_millis(500));
+
+    let mut sent = simulate_ctrl_key(VK_V);
+    thread::sleep(Duration::from_millis(220));
+
+    if !sent {
+        sent = simulate_shift_insert();
+        thread::sleep(Duration::from_millis(220));
+    }
 
     if let Some(orig) = original {
         let _ = clipboard.set_text(orig);
     }
 
-    true
+    sent
 }
 
 pub fn save_source_pid() {
@@ -125,11 +223,13 @@ pub fn restore_source_app() {
         GetWindowThreadProcessId(hwnd, &mut pid);
         let current = GetCurrentProcessId();
         if pid != current {
-            let alt_down = kbd_input(VK_MENU, 0);
-            let alt_up = kbd_input(VK_MENU, KEYEVENTF_KEYUP);
-            SendInput(1, &alt_down, std::mem::size_of::<INPUT>() as i32);
-            SetForegroundWindow(hwnd);
-            SendInput(1, &alt_up, std::mem::size_of::<INPUT>() as i32);
+            for _ in 0..4 {
+                SetForegroundWindow(hwnd);
+                if GetForegroundWindow() == hwnd {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(40));
+            }
         }
     }
 }
