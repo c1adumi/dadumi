@@ -24,6 +24,10 @@ $asset = $release.assets | Where-Object { $_.name -like "*_${arch}_en-US.msi" } 
 if (-not $asset) {
     $asset = $release.assets | Where-Object { $_.name -like "*_${arch}-setup.exe" } | Select-Object -First 1
 }
+if (-not $asset -and $arch -eq "arm64") {
+    Write-Info "arm64 asset not found, falling back to x64 (emulated)"
+    $asset = $release.assets | Where-Object { $_.name -like "*_x64_en-US.msi" } | Select-Object -First 1
+}
 if (-not $asset) { Write-Fail "No Windows asset found for $arch in release $version" }
 
 $tmpFile = Join-Path $env:TEMP $asset.name

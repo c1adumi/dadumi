@@ -37,6 +37,20 @@ fn open_settings(app: tauri::AppHandle) {
     show_settings_window(&app);
 }
 
+#[tauri::command]
+fn notify_dom_ready(app: tauri::AppHandle) {
+    for _ in 0..10 {
+        if let Some(win) = app.get_webview_window("settings") {
+            let _ = win.show();
+            let _ = win.set_focus();
+            SETTINGS_OPENING.store(false, Ordering::SeqCst);
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    SETTINGS_OPENING.store(false, Ordering::SeqCst);
+}
+
 fn show_settings_window(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("settings") {
         let _ = win.show();
@@ -66,7 +80,6 @@ fn show_settings_window(app: &tauri::AppHandle) {
         }
     };
 
-    let win_clone = win.clone();
     let app_for_close = app.clone();
     win.on_window_event(move |event| {
         match event {
@@ -79,18 +92,12 @@ fn show_settings_window(app: &tauri::AppHandle) {
             _ => {}
         }
     });
-
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(400));
-        SETTINGS_OPENING.store(false, Ordering::SeqCst);
-        let _ = win_clone.show();
-        let _ = win_clone.set_focus();
-    });
 }
 
 #[tauri::command]
 fn paste_text(text: String, window: tauri::WebviewWindow) {
     let _ = window.hide();
+    std::thread::sleep(std::time::Duration::from_millis(150));
     os_integration::restore_source_app();
     std::thread::sleep(std::time::Duration::from_millis(300));
     os_integration::paste_text(text);
@@ -112,11 +119,8 @@ pub fn run() {
                         let app_handle = app.clone();
                         std::thread::spawn(move || {
                             os_integration::save_source_pid();
-                            #[cfg(target_os = "macos")]
-                            {
-                                os_integration::restore_source_app();
-                                std::thread::sleep(std::time::Duration::from_millis(200));
-                            }
+                            os_integration::restore_source_app();
+                            std::thread::sleep(std::time::Duration::from_millis(200));
                             let captured_text = os_integration::get_selected_text().unwrap_or_default();
                             let (mouse_x, mouse_y) = os_integration::get_mouse_position();
 
@@ -201,6 +205,7 @@ pub fn run() {
             hide_window,
             show_main_window,
             open_settings,
+            notify_dom_ready,
             paste_text,
             get_caret_position
         ])

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSettings } from "../context/SettingsContext";
-import { isTauri, invokeCmd } from "../utils/tauriBridge";
+import { isTauri } from "../utils/tauriBridge";
 import { PROVIDERS, parseProviderResponse, type ProviderID } from "../utils/providers";
 import type { Theme } from "../utils/settings";
 import type { Language } from "../utils/i18n";
@@ -81,7 +81,6 @@ export default function SettingsWindow() {
 
   const handleConfirm = async () => {
     setSystemPrompt(draftPrompt, lang);
-    await invokeCmd("show_main_window");
     if (isTauri()) {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       getCurrentWindow().close();

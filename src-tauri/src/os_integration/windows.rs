@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 use windows_sys::Win32::Foundation::{POINT, CloseHandle};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, GetForegroundWindow, SetForegroundWindow, GetWindowThreadProcessId,
-    MessageBoxW, MB_OK, MB_ICONWARNING, HWND_DESKTOP,
+    MessageBoxW, MB_OK, MB_ICONWARNING,
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
@@ -43,8 +43,12 @@ fn kbd_input(vk: u16, flags: u32) -> INPUT {
 }
 
 fn simulate_ctrl_key(vk: u16) -> bool {
+    unsafe {
+        let alt_up = kbd_input(VK_MENU, KEYEVENTF_KEYUP);
+        SendInput(1, &alt_up, std::mem::size_of::<INPUT>() as i32);
+        thread::sleep(Duration::from_millis(10));
+    }
     let inputs = [
-        kbd_input(VK_MENU, KEYEVENTF_KEYUP),
         kbd_input(VK_CONTROL, 0),
         kbd_input(vk, 0),
         kbd_input(vk, KEYEVENTF_KEYUP),
@@ -137,7 +141,7 @@ pub fn request_accessibility_if_needed() {
                 .encode_utf16().chain(std::iter::once(0)).collect();
             let title: Vec<u16> = "Dadumi – Notice"
                 .encode_utf16().chain(std::iter::once(0)).collect();
-            MessageBoxW(HWND_DESKTOP, msg.as_ptr(), title.as_ptr(), MB_OK | MB_ICONWARNING);
+            MessageBoxW(0isize as _, msg.as_ptr(), title.as_ptr(), MB_OK | MB_ICONWARNING);
         });
     }
 }
