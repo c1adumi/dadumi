@@ -110,7 +110,10 @@ export default function FloatingMenu({ selectionText, onHide }: FloatingMenuProp
     const finalResult = streamedText || selectionText;
     if (!finalResult) return;
     try {
-      await invokeCmd("paste_text", { text: finalResult });
+      const pasted = await invokeCmd("paste_text", { text: finalResult });
+      if (pasted === false) {
+        throw new Error("Paste command was not accepted by the target app");
+      }
       onHide();
     } catch (err: any) {
       const hint = navigator.userAgent.includes("Windows")
