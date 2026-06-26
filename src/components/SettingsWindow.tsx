@@ -41,9 +41,13 @@ export default function SettingsWindow() {
     setConfigField,
     setSystemPrompt,
     setLanguage,
+    setInsertShortcutKey,
     persistConfigField,
     refreshModels,
   } = useSettings();
+
+  const isMac = typeof navigator !== "undefined" && navigator.platform.toUpperCase().includes("MAC");
+  const modifierLabel = isMac ? "⌘ Cmd" : "Ctrl";
 
   const currentTheme = settings.theme ?? "dark";
   const availableModels = dynamicModels.length > 0 ? dynamicModels : activeProviderDef.models;
@@ -123,6 +127,37 @@ export default function SettingsWindow() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="settings-section">
+          <label className="form-label">{tr.settings.insertShortcut}</label>
+          <p className="form-hint">{tr.settings.insertShortcutDesc}</p>
+          <div className="shortcut-input-row">
+            <span className="shortcut-modifier-badge">{modifierLabel}</span>
+            <span className="shortcut-plus">+</span>
+            <input
+              className="form-input shortcut-key-input"
+              type="text"
+              maxLength={20}
+              placeholder={tr.settings.insertShortcutPlaceholder}
+              value={settings.insertShortcutKey ?? "Enter"}
+              onChange={(e) => setInsertShortcutKey(e.target.value.trim() || "Enter")}
+              onKeyDown={(e) => {
+                e.preventDefault();
+                const key = e.key;
+                if (key === "Backspace" || key === "Delete") {
+                  setInsertShortcutKey("Enter");
+                  return;
+                }
+                if (key.length === 1 || key === "Enter" || key === "Tab" || key === "Space") {
+                  setInsertShortcutKey(key === " " ? "Space" : key);
+                }
+              }}
+            />
+          </div>
+          <p className="form-hint shortcut-preview">
+            {modifierLabel} + {settings.insertShortcutKey ?? "Enter"}
+          </p>
         </div>
 
         <div className="settings-section">
