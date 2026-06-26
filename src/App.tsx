@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import "./styles/index.css";
 import FloatingMenu from "./components/FloatingMenu";
 import { listenEvent, triggerMockEvent, isTauri, invokeCmd } from "./utils/tauriBridge";
+import type { PresetID } from "./components/FloatingMenu";
 
 function App() {
   const [selectionText, setSelectionText] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [lastPreset, setLastPreset] = useState<PresetID>("professional");
 
   // Simulation state (for testing inside browser)
   const [mockActiveApp, setMockActiveApp] = useState("Google Chrome");
@@ -96,6 +98,8 @@ function App() {
         <FloatingMenu
           selectionText={selectionText}
           onHide={handleHide}
+          initialPreset={lastPreset}
+          onPresetChange={setLastPreset}
         />
       )}
 

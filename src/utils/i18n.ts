@@ -20,6 +20,9 @@ export const translations = {
       confirm: "Confirm",
       loadingModels: "Loading models...",
       translating: "Translating...",
+      insertShortcut: "Insert Shortcut",
+      insertShortcutDesc: "Key to press with Ctrl (Win) / Cmd (Mac)",
+      insertShortcutPlaceholder: "e.g. Enter, z, j",
     },
     main: {
       customPlaceholder: "Custom instruction...",
@@ -28,7 +31,7 @@ export const translations = {
       stop: "Stop",
       copy: "Copy",
       copied: "Copied!",
-      insertReplace: "Insert / Replace",
+      insertReplace: "Insert\n(Replace)",
     },
   },
   ko: {
@@ -50,6 +53,9 @@ export const translations = {
       confirm: "확인",
       loadingModels: "모델 불러오는 중...",
       translating: "번역 중...",
+      insertShortcut: "삽입 단축키",
+      insertShortcutDesc: "Ctrl (Win) / Cmd (Mac) 과 함께 누를 키",
+      insertShortcutPlaceholder: "예) Enter, z, j",
     },
     main: {
       customPlaceholder: "직접 입력...",
