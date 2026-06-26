@@ -16,6 +16,7 @@ export interface AppSettings {
   systemPrompts: Record<Language, string>
   language: Language
   theme: Theme
+  insertShortcutKey: string
   providers: Partial<Record<ProviderID, ProviderSettings>>
 }
 
@@ -27,6 +28,7 @@ function defaultSettings(): AppSettings {
     systemPrompts: { en: DEFAULT_PROMPTS.en, ko: DEFAULT_PROMPTS.ko },
     language: "en",
     theme: "dark",
+    insertShortcutKey: "Enter",
     providers: { bedrock: defaultProviderSettings("bedrock") },
   }
 }
@@ -74,6 +76,7 @@ function migrateSettings(settings: AppSettings): AppSettings {
     systemPrompts,
     language: settings.language ?? "en",
     theme: settings.theme ?? "dark",
+    insertShortcutKey: settings.insertShortcutKey ?? "Enter",
     providers,
   }
 }

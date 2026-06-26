@@ -25,6 +25,7 @@ interface SettingsContextValue {
   setSystemPrompt: (prompt: string, lang?: Language) => void;
   setLanguage: (lang: Language) => void;
   setTheme: (theme: Theme) => void;
+  setInsertShortcutKey: (key: string) => void;
   persistConfigField: () => void;
   refreshModels: () => void;
   currentSystemPrompt: string;
@@ -102,6 +103,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     persist({ ...settings, theme });
   }, [settings, persist]);
 
+  const setInsertShortcutKey = useCallback((key: string) => {
+    persist({ ...settings, insertShortcutKey: key });
+  }, [settings, persist]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme ?? "dark";
   }, [settings.theme]);
@@ -136,6 +141,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSystemPrompt,
     setLanguage,
     setTheme,
+    setInsertShortcutKey,
     persistConfigField,
     refreshModels,
     currentSystemPrompt: getSystemPrompt(settings),
