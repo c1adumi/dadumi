@@ -99,7 +99,7 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
   };
 
   useEffect(() => {
-    if (selectionText) {
+    if (selectionText && settings.autoTrigger) {
       handleAIQuery(presetInstructions[initialPreset]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

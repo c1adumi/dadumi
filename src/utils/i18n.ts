@@ -23,6 +23,10 @@ export const translations = {
       insertShortcut: "Insert Shortcut",
       insertShortcutDesc: "Key to press with Ctrl (Win) / Cmd (Mac)",
       insertShortcutPlaceholder: "e.g. Enter, z, j",
+      triggerMode: "Trigger Mode",
+      triggerModeDesc: "Auto: runs AI immediately on hotkey. Manual: select a preset first.",
+      triggerManual: "Manual",
+      triggerAuto: "Auto",
     },
     main: {
       customPlaceholder: "Custom instruction...",
@@ -56,6 +60,10 @@ export const translations = {
       insertShortcut: "삽입 단축키",
       insertShortcutDesc: "Ctrl (Win) / Cmd (Mac) 과 함께 누를 키",
       insertShortcutPlaceholder: "예) Enter, z, j",
+      triggerMode: "실행 모드",
+      triggerModeDesc: "자동: 단축키 누르면 바로 AI 실행. 수동: 프리셋 먼저 선택.",
+      triggerManual: "수동",
+      triggerAuto: "자동",
     },
     main: {
       customPlaceholder: "직접 입력...",
