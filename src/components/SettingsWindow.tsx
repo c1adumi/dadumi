@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { useSettings } from "../context/SettingsContext";
 import { isTauri, openUrl } from "../utils/tauriBridge";
-import { PROVIDERS, parseProviderResponse, copilotOAuthFlow, type ProviderID } from "../utils/providers";
+import { PROVIDERS, copilotOAuthFlow, type ProviderID } from "../utils/providers";
 import type { Theme } from "../utils/settings";
 import type { Language } from "../utils/i18n";
+import { DEFAULT_PROMPTS } from "../prompts";
 import "../styles/index.css";
 
 const IconSun = () => (
@@ -34,7 +35,6 @@ export default function SettingsWindow() {
     dynamicModels,
     isFetchingModels,
     tr,
-    currentSystemPrompt,
     setTheme,
     setActiveProvider,
     setModel,
@@ -53,35 +53,10 @@ export default function SettingsWindow() {
   const currentTheme = settings.theme ?? "dark";
   const availableModels = dynamicModels.length > 0 ? dynamicModels : activeProviderDef.models;
   const lang = settings.language ?? "en";
-  const otherLang: Language = lang === "en" ? "ko" : "en";
 
-  const [draftPrompt, setDraftPrompt] = useState(settings.systemPrompts[lang]);
-  const [isTranslating, setIsTranslating] = useState(false);
-
-  const handleTranslate = async () => {
-    if (isTranslating || !draftPrompt) return;
-    setIsTranslating(true);
-    try {
-      const targetLangLabel = lang === "en" ? "Korean" : "English";
-      const instruction = `Translate the following system prompt to ${targetLangLabel}. Return ONLY the translated text, no explanation:\n\n${draftPrompt}`;
-
-      const response = await activeProviderDef.buildRequest(
-        activeProviderSettings.config,
-        activeProviderSettings.model,
-        currentSystemPrompt,
-        instruction,
-        new AbortController().signal,
-      );
-      if (response.ok) {
-        const translated = await parseProviderResponse(settings.activeProvider, response);
-        setSystemPrompt(draftPrompt, lang);
-        setSystemPrompt(translated, otherLang);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setIsTranslating(false);
-    }
+  const toDisplayPrompt = (value: string) => {
+    const isAnyDefault = (Object.values(DEFAULT_PROMPTS) as string[]).includes(value);
+    return !value || isAnyDefault ? "" : value;
   };
 
   const [copilotStatus, setCopilotStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
@@ -115,6 +90,15 @@ export default function SettingsWindow() {
       if (!abort.signal.aborted) setCopilotStatus("error");
     }
   };
+
+  const [draftPrompt, setDraftPrompt] = useState(() =>
+    toDisplayPrompt(settings.systemPrompts[lang])
+  );
+
+  useEffect(() => {
+    setDraftPrompt(toDisplayPrompt(settings.systemPrompts[lang]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   const handleConfirm = async () => {
     setSystemPrompt(draftPrompt, lang);
@@ -305,16 +289,8 @@ export default function SettingsWindow() {
         ))}
 
         <div className="settings-section">
-          <label className="form-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <label className="form-label">
             <span>{tr.settings.systemPrompt} ({lang === "en" ? "EN" : "KO"})</span>
-            <button
-              className="btn btn-secondary"
-              style={{ fontSize: "0.75rem", padding: "4px 10px", height: "auto" }}
-              onClick={handleTranslate}
-              disabled={isTranslating || !draftPrompt}
-            >
-              {isTranslating ? tr.settings.translating : tr.settings.translatePrompt}
-            </button>
           </label>
           <textarea
             className="form-input"
