@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSettings } from "../context/SettingsContext";
-import { isTauri } from "../utils/tauriBridge";
-import { PROVIDERS, parseProviderResponse, type ProviderID } from "../utils/providers";
+import { isTauri, openUrl } from "../utils/tauriBridge";
+import { PROVIDERS, parseProviderResponse, copilotOAuthFlow, type ProviderID } from "../utils/providers";
 import type { Theme } from "../utils/settings";
 import type { Language } from "../utils/i18n";
 import "../styles/index.css";
@@ -56,6 +56,38 @@ export default function SettingsWindow() {
 
   const [draftPrompt, setDraftPrompt] = useState(settings.systemPrompts[lang]);
   const [isTranslating, setIsTranslating] = useState(false);
+
+  const [copilotStatus, setCopilotStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+  const [copilotUserCode, setCopilotUserCode] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
+
+  const handleCopilotLogin = async () => {
+    abortRef.current?.abort();
+    const abort = new AbortController();
+    abortRef.current = abort;
+    setCopilotStatus("pending");
+    setCopilotUserCode(null);
+    try {
+      const flow = await copilotOAuthFlow();
+      setCopilotUserCode(flow.userCode);
+      await openUrl(flow.verificationUri);
+      const token = await flow.poll(abort.signal);
+      if (!token) {
+        if (!abort.signal.aborted) setCopilotStatus("error");
+        return;
+      }
+      setConfigField("apiKey", token);
+      persistConfigField();
+      setCopilotStatus("success");
+      setCopilotUserCode(null);
+    } catch {
+      if (!abort.signal.aborted) setCopilotStatus("error");
+    }
+  };
 
   const handleTranslate = async () => {
     if (isTranslating || !draftPrompt) return;
@@ -204,7 +236,41 @@ export default function SettingsWindow() {
           </select>
         </div>
 
-        {activeProviderDef.fields.map((field) => (
+        {settings.activeProvider === "github-copilot" && (
+          <div className="settings-section">
+            <label className="form-label">GitHub Authentication</label>
+            {copilotStatus === "pending" && copilotUserCode && (
+              <p className="form-hint">
+                Enter this code in your browser: <strong>{copilotUserCode}</strong>
+              </p>
+            )}
+            {copilotStatus === "error" && (
+              <p className="form-hint" style={{ color: "var(--color-error, #f87171)" }}>
+                Authentication failed. Please try again.
+              </p>
+            )}
+            {copilotStatus === "success" && (
+              <p className="form-hint" style={{ color: "var(--color-success, #4ade80)" }}>
+                Authenticated! Loading models...
+              </p>
+            )}
+            <button
+              className="btn btn-secondary"
+              onClick={handleCopilotLogin}
+              disabled={copilotStatus === "pending"}
+            >
+              {copilotStatus === "pending"
+                ? "Waiting for authorization..."
+                : activeProviderSettings.config.apiKey
+                  ? "Re-authenticate"
+                  : "Login with GitHub"}
+            </button>
+          </div>
+        )}
+
+        {activeProviderDef.fields
+          .filter((field) => !(settings.activeProvider === "github-copilot" && field.key === "apiKey"))
+          .map((field) => (
           <div key={field.key} className="settings-section">
             <label className="form-label">{field.label}</label>
             <input

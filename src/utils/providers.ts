@@ -1,9 +1,12 @@
+import { invokeCmd, isTauri } from "./tauriBridge"
+
 export type ProviderID =
   | "openai"
   | "anthropic"
   | "gemini"
   | "bedrock"
   | "openrouter"
+  | "github-copilot"
   | "custom"
 
 export interface ModelDef {
@@ -241,6 +244,119 @@ export const openrouter: ProviderDef = {
   },
 }
 
+const COPILOT_BASE_URL = "https://api.githubcopilot.com"
+const COPILOT_API_VERSION = "2026-06-01"
+const COPILOT_POLL_SAFETY_MARGIN_MS = 3000
+
+export async function copilotOAuthFlow(): Promise<{
+  userCode: string
+  verificationUri: string
+  poll: (signal: AbortSignal) => Promise<string | null>
+}> {
+  if (!isTauri()) {
+    throw new Error("GitHub Copilot login requires the desktop app")
+  }
+
+  const data = await invokeCmd("copilot_device_code") as {
+    device_code: string
+    user_code: string
+    verification_uri: string
+    interval: number
+  }
+
+  return {
+    userCode: data.user_code,
+    verificationUri: data.verification_uri,
+    async poll(signal: AbortSignal): Promise<string | null> {
+      let interval = data.interval ?? 5
+
+      while (!signal.aborted) {
+        await new Promise((resolve) => setTimeout(resolve, interval * 1000 + COPILOT_POLL_SAFETY_MARGIN_MS))
+        if (signal.aborted) return null
+
+        const tokenData = await invokeCmd("copilot_poll_token", { deviceCode: data.device_code }) as {
+          access_token?: string
+          error?: string
+          interval?: number
+        }
+
+        console.log("[Copilot] poll:", tokenData.error ?? "access_token received")
+
+        if (tokenData.access_token) return tokenData.access_token
+
+        if (tokenData.error === "slow_down") {
+          interval = tokenData.interval ?? interval + 5
+          continue
+        }
+
+        if (tokenData.error === "authorization_pending") continue
+
+        console.error("[Copilot] unexpected error:", tokenData.error)
+        return null
+      }
+
+      return null
+    },
+  }
+}
+
+async function fetchCopilotModels(token: string): Promise<ModelDef[]> {
+  const res = await fetch(`${COPILOT_BASE_URL}/models`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-GitHub-Api-Version": COPILOT_API_VERSION,
+    },
+    signal: AbortSignal.timeout(5000),
+  })
+  if (!res.ok) return []
+  const data = await res.json() as { data?: { id: string; name: string; model_picker_enabled: boolean }[] }
+  return (data.data ?? [])
+    .filter((m) => m.model_picker_enabled)
+    .map((m) => ({ id: m.id, label: m.name }))
+}
+
+export const copilot: ProviderDef = {
+  id: "github-copilot",
+  label: "GitHub Copilot",
+  fields: [
+    {
+      key: "apiKey",
+      label: "Access Token",
+      type: "password",
+      placeholder: "Managed by OAuth login",
+    },
+  ],
+  models: [
+    { id: "gpt-4o", label: "GPT-4o" },
+    { id: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+  ],
+  async fetchModels(config) {
+    if (!config.apiKey) return copilot.models
+    const models = await fetchCopilotModels(config.apiKey)
+    return models.length > 0 ? models : copilot.models
+  },
+  buildRequest(config, model, systemPrompt, userMessage, signal) {
+    return fetch(`${COPILOT_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`,
+        "Editor-Version": "vscode/1.85.0",
+        "Copilot-Integration-Id": "vscode-chat",
+        "X-GitHub-Api-Version": COPILOT_API_VERSION,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      }),
+      signal,
+    })
+  },
+}
+
 const customModels: ModelDef[] = [
   { id: "custom-model", label: "Custom Model" },
 ]
@@ -289,7 +405,7 @@ export const custom: ProviderDef = {
   },
 }
 
-export const PROVIDERS: ProviderDef[] = [openai, anthropic, gemini, bedrock, openrouter, custom]
+export const PROVIDERS: ProviderDef[] = [openai, anthropic, gemini, bedrock, openrouter, copilot, custom]
 
 export const getProvider = (id: ProviderID): ProviderDef =>
   PROVIDERS.find((p) => p.id === id) ?? bedrock

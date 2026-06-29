@@ -5,6 +5,65 @@ use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, GlobalShortcutExt}
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const COPILOT_CLIENT_ID: &str = "Iv23liP24bCTaV00ZVHw";
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct DeviceCodeResponse {
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    interval: u64,
+    expires_in: u64,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+#[tauri::command]
+async fn copilot_device_code() -> Result<DeviceCodeResponse, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://github.com/login/device/code")
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({ "client_id": COPILOT_CLIENT_ID }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let data: DeviceCodeResponse = res.json().await.map_err(|e| e.to_string())?;
+    if let Some(ref err) = data.error {
+        return Err(err.clone());
+    }
+    Ok(data)
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct TokenPollResponse {
+    access_token: Option<String>,
+    error: Option<String>,
+    interval: Option<u64>,
+}
+
+#[tauri::command]
+async fn copilot_poll_token(device_code: String) -> Result<TokenPollResponse, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://github.com/login/oauth/access_token")
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "client_id": COPILOT_CLIENT_ID,
+            "device_code": device_code,
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let data: TokenPollResponse = res.json().await.map_err(|e| e.to_string())?;
+    Ok(data)
+}
+
 mod os_integration;
 
 static SETTINGS_OPENING: AtomicBool = AtomicBool::new(false);
@@ -197,6 +256,7 @@ fn get_caret_position() -> CaretPosition {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -329,7 +389,9 @@ pub fn run() {
             open_settings,
             notify_dom_ready,
             paste_text,
-            get_caret_position
+            get_caret_position,
+            copilot_device_code,
+            copilot_poll_token,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
