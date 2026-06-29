@@ -65,8 +65,18 @@ export async function listenEvent(
 }
 
 /**
- * Triggers a mock event in the browser. Used by the simulator overlay.
+ * Opens a URL in the system default browser.
+ * Falls back to window.open() in browser dev mode.
  */
+export async function openUrl(url: string): Promise<void> {
+  if (!isTauri()) {
+    window.open(url, "_blank");
+    return;
+  }
+  const { open } = await import("@tauri-apps/plugin-shell");
+  await open(url);
+}
+
 export function triggerMockEvent(eventName: string, payload: any) {
   if (isTauri()) return;
   console.log(`[Tauri Mock] Triggering event "${eventName}" with payload:`, payload);
