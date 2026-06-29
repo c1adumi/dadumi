@@ -206,7 +206,7 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
               key={id}
               className={`preset-card ${index === focusedPresetIndex ? "focused" : ""}`}
               disabled={isGenerating || !selectionText}
-              onClick={() => { onPresetChange(id); handleAIQuery(presetInstructions[id]); }}
+              onClick={() => { setFocusedPresetIndex(index); onPresetChange(id); handleAIQuery(presetInstructions[id]); }}
             >
               <span className="preset-icon">{PRESET_ICONS[id]}</span>
               <span className="preset-title">{tr.presets[id]}</span>
