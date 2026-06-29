@@ -85,7 +85,8 @@ function migrateSettings(settings: AppSettings): AppSettings {
 }
 
 export function getSystemPrompt(settings: AppSettings): string {
-  return settings.systemPrompts[settings.language] ?? settings.systemPrompts.en
+  const prompt = settings.systemPrompts[settings.language] ?? settings.systemPrompts.en
+  return prompt.trim() || DEFAULT_PROMPTS[settings.language] || DEFAULT_PROMPTS.en
 }
 
 export function saveSettings(settings: AppSettings): void {
