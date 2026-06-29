@@ -42,6 +42,7 @@ export default function SettingsWindow() {
     setSystemPrompt,
     setLanguage,
     setInsertShortcutKey,
+    setAutoTrigger,
     persistConfigField,
     refreshModels,
   } = useSettings();
@@ -190,6 +191,25 @@ export default function SettingsWindow() {
           <p className="form-hint shortcut-preview">
             {modifierLabel} + {settings.insertShortcutKey ?? "Enter"}
           </p>
+        </div>
+
+        <div className="settings-section">
+          <label className="form-label">{tr.settings.triggerMode}</label>
+          <p className="form-hint">{tr.settings.triggerModeDesc}</p>
+          <div className="theme-switcher">
+            <button
+              className={`theme-option ${!settings.autoTrigger ? "active" : ""}`}
+              onClick={() => setAutoTrigger(false)}
+            >
+              <span>{tr.settings.triggerManual}</span>
+            </button>
+            <button
+              className={`theme-option ${settings.autoTrigger ? "active" : ""}`}
+              onClick={() => setAutoTrigger(true)}
+            >
+              <span>{tr.settings.triggerAuto}</span>
+            </button>
+          </div>
         </div>
 
         <div className="settings-section">

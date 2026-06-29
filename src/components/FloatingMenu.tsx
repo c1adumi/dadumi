@@ -46,6 +46,7 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [dragReady, setDragReady] = useState(false);
+  const [focusedPresetIndex, setFocusedPresetIndex] = useState(0);
 
   const streamEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -99,11 +100,32 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
   };
 
   useEffect(() => {
-    if (selectionText) {
+    if (selectionText && settings.autoTrigger) {
       handleAIQuery(presetInstructions[initialPreset]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isGenerating || !selectionText) return;
+      
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedPresetIndex((i) => (i + 1) % PRESET_IDS.length);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedPresetIndex((i) => (i - 1 + PRESET_IDS.length) % PRESET_IDS.length);
+      } else if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        const selectedId = PRESET_IDS[focusedPresetIndex];
+        onPresetChange(selectedId);
+        handleAIQuery(presetInstructions[selectedId]);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isGenerating, selectionText, focusedPresetIndex, presetInstructions, onPresetChange]);
 
   const handleDragStart = async (e: React.MouseEvent) => {
     if (e.button !== 0 || !isTauri() || !dragReady) return;
@@ -177,10 +199,10 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
 
       <main className="scroll-content">
         <section className="presets-grid">
-          {PRESET_IDS.map((id) => (
+          {PRESET_IDS.map((id, index) => (
             <button
               key={id}
-              className="preset-card"
+              className={`preset-card ${index === focusedPresetIndex ? "focused" : ""}`}
               disabled={isGenerating || !selectionText}
               onClick={() => { onPresetChange(id); handleAIQuery(presetInstructions[id]); }}
             >

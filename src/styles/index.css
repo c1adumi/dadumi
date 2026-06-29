@@ -237,6 +237,11 @@ body,
   transform: none;
 }
 
+.preset-card.focused:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  outline: 1px solid var(--cohere-coral);
+}
+
 .preset-card:active:not(:disabled) {
   background: rgba(255, 255, 255, 0.12);
   transform: none;
@@ -703,6 +708,11 @@ body,
 
 [data-theme="light"] .preset-card:hover:not(:disabled) {
   background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .preset-card.focused:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+  outline: 1px solid var(--cohere-coral);
 }
 
 [data-theme="light"] .preset-card:active:not(:disabled) {
