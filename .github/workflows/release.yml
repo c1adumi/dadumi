@@ -9,7 +9,28 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:run
+
   release:
+    needs: test
     strategy:
       fail-fast: false
       matrix:
@@ -118,4 +139,3 @@ jobs:
 
           gh release upload "$TAG" "$DMG_PATH" --clobber
           echo "Uploaded: $DMG_NAME"
-
