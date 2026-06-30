@@ -345,17 +345,23 @@ export async function copilotOAuthFlow(): Promise<{
 async function fetchCopilotModels(githubToken: string): Promise<ModelDef[]> {
   try {
     const sessionToken = await getCopilotSessionToken(githubToken)
-    const res = await fetch(`${COPILOT_BASE_URL}/models`, {
-      headers: {
-        Authorization: `Bearer ${sessionToken}`,
-        "X-GitHub-Api-Version": COPILOT_API_VERSION,
-        "Editor-Version": "vscode/1.85.0",
-        "Copilot-Integration-Id": "vscode-chat",
-      },
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!res.ok) return []
-    const data = await res.json() as { data?: { id: string; name: string; model_picker_enabled: boolean }[] }
+    let json: string
+    if (isTauri()) {
+      json = await invokeCmd("copilot_models", { sessionToken }) as string
+    } else {
+      const res = await fetch(`${COPILOT_BASE_URL}/models`, {
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+          "X-GitHub-Api-Version": COPILOT_API_VERSION,
+          "Editor-Version": "vscode/1.85.0",
+          "Copilot-Integration-Id": "vscode-chat",
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!res.ok) return []
+      json = await res.text()
+    }
+    const data = JSON.parse(json) as { data?: { id: string; name: string; model_picker_enabled: boolean }[] }
     return (data.data ?? [])
       .filter((m) => m.model_picker_enabled)
       .map((m) => ({ id: m.id, label: m.name }))
@@ -395,7 +401,17 @@ export const copilot: ProviderDef = {
 
     const sessionToken = await getCopilotSessionToken(githubToken)
 
-    const res = await fetch(`${COPILOT_BASE_URL}/chat/completions`, {
+    if (isTauri()) {
+      const body = await invokeCmd("copilot_chat", {
+        sessionToken,
+        model,
+        systemPrompt,
+        userMessage,
+      }) as string
+      return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } })
+    }
+
+    return fetch(`${COPILOT_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -413,18 +429,6 @@ export const copilot: ProviderDef = {
       }),
       signal,
     })
-
-    if (res.status === 403) {
-      const body = await invokeCmd("copilot_chat", {
-        sessionToken,
-        model,
-        systemPrompt,
-        userMessage,
-      }) as string
-      return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } })
-    }
-
-    return res
   },
 }
 
