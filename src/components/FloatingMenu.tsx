@@ -43,9 +43,11 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
 
   const [customPrompt, setCustomPrompt] = useState("");
   const [streamedText, setStreamedText] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [dragReady, setDragReady] = useState(false);
+  const [focusedPresetIndex, setFocusedPresetIndex] = useState(0);
 
   const streamEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -54,6 +56,7 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
     if (isGenerating) return;
     setIsGenerating(true);
     setStreamedText("");
+    setErrorMessage(null);
 
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
@@ -63,7 +66,7 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
         (f) => f.key === "apiKey" && !f.label.toLowerCase().includes("optional")
       );
       if (requiresKey && !activeProviderSettings.config.apiKey) {
-        setStreamedText(`⚠️ Please open settings (⚙️) and enter your ${activeProviderDef.label} API Key.`);
+        setErrorMessage(`Please open settings (⚙️) and enter your ${activeProviderDef.label} API Key.`);
         setIsGenerating(false);
         return;
       }
@@ -85,7 +88,7 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
       setStreamedText(await parseProviderResponse(settings.activeProvider, response));
     } catch (err: any) {
       if (err.name !== "AbortError") {
-        setStreamedText((prev) => prev + `\n\n⚠️ Error: ${err.message}`);
+        setErrorMessage(`Error: ${err.message}`);
       }
     } finally {
       setIsGenerating(false);
@@ -99,11 +102,32 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
   };
 
   useEffect(() => {
-    if (selectionText) {
+    if (selectionText && settings.autoTrigger) {
       handleAIQuery(presetInstructions[initialPreset]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isGenerating || !selectionText) return;
+      
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedPresetIndex((i) => (i + 1) % PRESET_IDS.length);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedPresetIndex((i) => (i - 1 + PRESET_IDS.length) % PRESET_IDS.length);
+      } else if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        const selectedId = PRESET_IDS[focusedPresetIndex];
+        onPresetChange(selectedId);
+        handleAIQuery(presetInstructions[selectedId]);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isGenerating, selectionText, focusedPresetIndex, presetInstructions, onPresetChange]);
 
   const handleDragStart = async (e: React.MouseEvent) => {
     if (e.button !== 0 || !isTauri() || !dragReady) return;
@@ -136,7 +160,7 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
       const hint = navigator.userAgent.includes("Windows")
         ? "Ensure Dadumi is not running as Administrator if the target app is not elevated."
         : "Check Accessibility permission in System Settings → Privacy & Security → Accessibility.";
-      setStreamedText((prev) => prev + `\n\n⚠️ Paste failed: ${err}. ${hint}`);
+      setErrorMessage(`Paste failed: ${err}. ${hint}`);
     }
   };
 
@@ -148,13 +172,13 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
       const keyMatches = shortcutKey === "Space"
         ? e.code === "Space"
         : e.key === shortcutKey;
-      if (!modifierHeld || !keyMatches || isGenerating) return;
+      if (!modifierHeld || !keyMatches || isGenerating || errorMessage) return;
       e.preventDefault();
       handlePasteBack();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isGenerating, streamedText, selectionText, settings.insertShortcutKey]);
+  }, [isGenerating, streamedText, selectionText, settings.insertShortcutKey, errorMessage]);
 
   const handleCopyToClipboard = () => {
     const finalResult = streamedText || selectionText;
@@ -177,12 +201,12 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
 
       <main className="scroll-content">
         <section className="presets-grid">
-          {PRESET_IDS.map((id) => (
+          {PRESET_IDS.map((id, index) => (
             <button
               key={id}
-              className="preset-card"
+              className={`preset-card ${index === focusedPresetIndex ? "focused" : ""}`}
               disabled={isGenerating || !selectionText}
-              onClick={() => { onPresetChange(id); handleAIQuery(presetInstructions[id]); }}
+              onClick={() => { setFocusedPresetIndex(index); onPresetChange(id); handleAIQuery(presetInstructions[id]); }}
             >
               <span className="preset-icon">{PRESET_ICONS[id]}</span>
               <span className="preset-title">{tr.presets[id]}</span>
@@ -216,14 +240,14 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
           </button>
         </section>
 
-        {(streamedText || isGenerating) && (
-          <section className={`result-panel ${streamedText.includes("⚠️") ? "error-state" : ""}`}>
+        {(streamedText || isGenerating || errorMessage) && (
+          <section className={`result-panel ${errorMessage ? "error-state" : ""}`}>
             <div className="section-label">
               {tr.main.aiOutput}
               {isGenerating && <span className="cohere-status-badge" style={{ marginLeft: "auto", fontSize: "0.65rem", padding: "1px 6px" }}>GEN</span>}
             </div>
             <div className="stream-area">
-              {streamedText}
+              {errorMessage ? `⚠️ ${errorMessage}` : streamedText}
               {isGenerating && <span className="cursor-caret" />}
               <div ref={streamEndRef} />
             </div>
@@ -242,14 +266,14 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
           </button>
         ) : (
           <>
-            <button className="btn btn-secondary" onClick={handleCopyToClipboard} disabled={!streamedText}>
+            <button className="btn btn-secondary" onClick={handleCopyToClipboard} disabled={!streamedText || !!errorMessage}>
               {copySuccess ? (
                 <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>{tr.main.copied}</>
               ) : (
                 <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>{tr.main.copy}</>
               )}
             </button>
-            <button className="btn btn-primary" onClick={handlePasteBack} disabled={!streamedText && !selectionText}>
+            <button className="btn btn-primary" onClick={handlePasteBack} disabled={!!errorMessage || (!streamedText && !selectionText)}>
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="m17 5-5-3-5 3"/><path d="m7 19 5 3 5-3"/></svg>
               <span className="btn-insert-label">
                 {tr.main.insertReplace.split("\n").map((line, i) => (

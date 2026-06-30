@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSettings } from "../context/SettingsContext";
-import { isTauri } from "../utils/tauriBridge";
-import { PROVIDERS, parseProviderResponse, type ProviderID } from "../utils/providers";
+import { isTauri, openUrl } from "../utils/tauriBridge";
+import { PROVIDERS, copilotOAuthFlow, type ProviderID } from "../utils/providers";
 import type { Theme } from "../utils/settings";
 import type { Language } from "../utils/i18n";
+import { DEFAULT_PROMPTS } from "../prompts";
 import "../styles/index.css";
 
 const IconSun = () => (
@@ -34,7 +35,6 @@ export default function SettingsWindow() {
     dynamicModels,
     isFetchingModels,
     tr,
-    currentSystemPrompt,
     setTheme,
     setActiveProvider,
     setModel,
@@ -42,6 +42,7 @@ export default function SettingsWindow() {
     setSystemPrompt,
     setLanguage,
     setInsertShortcutKey,
+    setAutoTrigger,
     persistConfigField,
     refreshModels,
   } = useSettings();
@@ -52,36 +53,51 @@ export default function SettingsWindow() {
   const currentTheme = settings.theme ?? "dark";
   const availableModels = dynamicModels.length > 0 ? dynamicModels : activeProviderDef.models;
   const lang = settings.language ?? "en";
-  const otherLang: Language = lang === "en" ? "ko" : "en";
 
-  const [draftPrompt, setDraftPrompt] = useState(settings.systemPrompts[lang]);
-  const [isTranslating, setIsTranslating] = useState(false);
+  const toDisplayPrompt = (value: string) => {
+    const isAnyDefault = (Object.values(DEFAULT_PROMPTS) as string[]).includes(value);
+    return !value || isAnyDefault ? "" : value;
+  };
 
-  const handleTranslate = async () => {
-    if (isTranslating || !draftPrompt) return;
-    setIsTranslating(true);
+  const [copilotStatus, setCopilotStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+  const [copilotUserCode, setCopilotUserCode] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
+
+  const handleCopilotLogin = async () => {
+    abortRef.current?.abort();
+    const abort = new AbortController();
+    abortRef.current = abort;
+    setCopilotStatus("pending");
+    setCopilotUserCode(null);
     try {
-      const targetLangLabel = lang === "en" ? "Korean" : "English";
-      const instruction = `Translate the following system prompt to ${targetLangLabel}. Return ONLY the translated text, no explanation:\n\n${draftPrompt}`;
-
-      const response = await activeProviderDef.buildRequest(
-        activeProviderSettings.config,
-        activeProviderSettings.model,
-        currentSystemPrompt,
-        instruction,
-        new AbortController().signal,
-      );
-      if (response.ok) {
-        const translated = await parseProviderResponse(settings.activeProvider, response);
-        setSystemPrompt(draftPrompt, lang);
-        setSystemPrompt(translated, otherLang);
+      const flow = await copilotOAuthFlow();
+      setCopilotUserCode(flow.userCode);
+      await openUrl(flow.verificationUri);
+      const token = await flow.poll(abort.signal);
+      if (!token) {
+        if (!abort.signal.aborted) setCopilotStatus("error");
+        return;
       }
+      setConfigField("githubToken", token);
+      setCopilotStatus("success");
+      setCopilotUserCode(null);
     } catch {
-      // ignore
-    } finally {
-      setIsTranslating(false);
+      if (!abort.signal.aborted) setCopilotStatus("error");
     }
   };
+
+  const [draftPrompt, setDraftPrompt] = useState(() =>
+    toDisplayPrompt(settings.systemPrompts[lang])
+  );
+
+  useEffect(() => {
+    setDraftPrompt(toDisplayPrompt(settings.systemPrompts[lang]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   const handleConfirm = async () => {
     setSystemPrompt(draftPrompt, lang);
@@ -161,6 +177,25 @@ export default function SettingsWindow() {
         </div>
 
         <div className="settings-section">
+          <label className="form-label">{tr.settings.triggerMode}</label>
+          <p className="form-hint">{tr.settings.triggerModeDesc}</p>
+          <div className="theme-switcher">
+            <button
+              className={`theme-option ${!settings.autoTrigger ? "active" : ""}`}
+              onClick={() => setAutoTrigger(false)}
+            >
+              <span>{tr.settings.triggerManual}</span>
+            </button>
+            <button
+              className={`theme-option ${settings.autoTrigger ? "active" : ""}`}
+              onClick={() => setAutoTrigger(true)}
+            >
+              <span>{tr.settings.triggerAuto}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="settings-section">
           <label className="form-label">{tr.settings.provider}</label>
           <div className="provider-tabs">
             {PROVIDERS.map((p) => (
@@ -204,7 +239,41 @@ export default function SettingsWindow() {
           </select>
         </div>
 
-        {activeProviderDef.fields.map((field) => (
+        {settings.activeProvider === "github-copilot" && (
+          <div className="settings-section">
+            <label className="form-label">GitHub Authentication</label>
+            {copilotStatus === "pending" && copilotUserCode && (
+              <p className="form-hint">
+                Enter this code in your browser: <strong>{copilotUserCode}</strong>
+              </p>
+            )}
+            {copilotStatus === "error" && (
+              <p className="form-hint" style={{ color: "var(--color-error, #f87171)" }}>
+                Authentication failed. Please try again.
+              </p>
+            )}
+            {copilotStatus === "success" && (
+              <p className="form-hint" style={{ color: "var(--color-success, #4ade80)" }}>
+                Authenticated! Loading models...
+              </p>
+            )}
+            <button
+              className="btn btn-secondary"
+              onClick={handleCopilotLogin}
+              disabled={copilotStatus === "pending"}
+            >
+              {copilotStatus === "pending"
+                ? "Waiting for authorization..."
+                : activeProviderSettings.config.githubToken
+                  ? "Re-authenticate"
+                  : "Login with GitHub"}
+            </button>
+          </div>
+        )}
+
+        {activeProviderDef.fields
+          .filter((field) => !(settings.activeProvider === "github-copilot" && field.key === "githubToken"))
+          .map((field) => (
           <div key={field.key} className="settings-section">
             <label className="form-label">{field.label}</label>
             <input
@@ -219,16 +288,8 @@ export default function SettingsWindow() {
         ))}
 
         <div className="settings-section">
-          <label className="form-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <label className="form-label">
             <span>{tr.settings.systemPrompt} ({lang === "en" ? "EN" : "KO"})</span>
-            <button
-              className="btn btn-secondary"
-              style={{ fontSize: "0.75rem", padding: "4px 10px", height: "auto" }}
-              onClick={handleTranslate}
-              disabled={isTranslating || !draftPrompt}
-            >
-              {isTranslating ? tr.settings.translating : tr.settings.translatePrompt}
-            </button>
           </label>
           <textarea
             className="form-input"

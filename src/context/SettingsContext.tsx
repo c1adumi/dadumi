@@ -26,6 +26,7 @@ interface SettingsContextValue {
   setLanguage: (lang: Language) => void;
   setTheme: (theme: Theme) => void;
   setInsertShortcutKey: (key: string) => void;
+  setAutoTrigger: (enabled: boolean) => void;
   persistConfigField: () => void;
   refreshModels: () => void;
   currentSystemPrompt: string;
@@ -47,7 +48,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const activeProviderSettings = getActiveProviderSettings(settings);
 
   const fetchModels = useCallback(async (providerDef: ProviderDef, config: Record<string, string>) => {
-    if (!providerDef.fetchModels || !config.apiKey) return;
+    if (!providerDef.fetchModels) return;
     setIsFetchingModels(true);
     try {
       const models = await providerDef.fetchModels(config);
@@ -64,6 +65,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     fetchModels(activeProviderDef, activeProviderSettings.config);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.activeProvider]);
+
+  useEffect(() => {
+    const copilotToken = settings.providers["github-copilot"]?.config.githubToken;
+    if (settings.activeProvider === "github-copilot" && copilotToken) {
+      fetchModels(activeProviderDef, activeProviderSettings.config);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.providers["github-copilot"]?.config.githubToken]);
 
   const setActiveProvider = useCallback((id: ProviderID) => {
     persist({ ...settings, activeProvider: id });
@@ -107,6 +116,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     persist({ ...settings, insertShortcutKey: key });
   }, [settings, persist]);
 
+  const setAutoTrigger = useCallback((enabled: boolean) => {
+    persist({ ...settings, autoTrigger: enabled });
+  }, [settings, persist]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme ?? "dark";
   }, [settings.theme]);
@@ -142,6 +155,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setLanguage,
     setTheme,
     setInsertShortcutKey,
+    setAutoTrigger,
     persistConfigField,
     refreshModels,
     currentSystemPrompt: getSystemPrompt(settings),

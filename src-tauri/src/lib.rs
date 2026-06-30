@@ -5,6 +5,178 @@ use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, GlobalShortcutExt}
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const COPILOT_CLIENT_ID: &str = "Iv1.b507a08c87ecfe98";
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct DeviceCodeResponse {
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    interval: u64,
+    expires_in: u64,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+#[tauri::command]
+async fn copilot_device_code() -> Result<DeviceCodeResponse, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://github.com/login/device/code")
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({ "client_id": COPILOT_CLIENT_ID }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let data: DeviceCodeResponse = res.json().await.map_err(|e| e.to_string())?;
+    if let Some(ref err) = data.error {
+        return Err(err.clone());
+    }
+    Ok(data)
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct TokenPollResponse {
+    access_token: Option<String>,
+    error: Option<String>,
+    interval: Option<u64>,
+}
+
+#[tauri::command]
+async fn copilot_poll_token(device_code: String) -> Result<TokenPollResponse, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://github.com/login/oauth/access_token")
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "client_id": COPILOT_CLIENT_ID,
+            "device_code": device_code,
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let data: TokenPollResponse = res.json().await.map_err(|e| e.to_string())?;
+    Ok(data)
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CopilotTokenResponse {
+    token: String,
+    expires_at: u64,
+}
+
+#[tauri::command]
+async fn copilot_exchange_token(github_token: String) -> Result<CopilotTokenResponse, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get("https://api.github.com/copilot_internal/v2/token")
+        .header("Authorization", format!("token {}", github_token.trim()))
+        .header("Accept", "application/json")
+        .header("User-Agent", "GitHubCopilotChat/0.26.7")
+        .header("Editor-Version", "vscode/1.99.3")
+        .header("Editor-Plugin-Version", "copilot-chat/0.26.7")
+        .header("Copilot-Integration-Id", "vscode-chat")
+        .send()
+        .await
+        .map_err(|e| format!("Token exchange failed: {}", e))?;
+
+    let status = res.status();
+    if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+        return Err("Authentication failed: re-authenticate required".to_string());
+    }
+    if !status.is_success() {
+        return Err(format!("Token exchange failed: HTTP {}", status));
+    }
+
+    let data: CopilotTokenResponse = res.json().await.map_err(|e| format!("Token exchange failed: {}", e))?;
+    Ok(data)
+}
+
+const COPILOT_API_BASE: &str = "https://api.githubcopilot.com";
+const COPILOT_API_VERSION: &str = "2026-06-01";
+
+fn copilot_api_headers(session_token: &str) -> Result<reqwest::header::HeaderMap, String> {
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        reqwest::header::AUTHORIZATION,
+        format!("Bearer {}", session_token)
+            .parse()
+            .map_err(|_| "Invalid session token: contains illegal header characters".to_string())?,
+    );
+    headers.insert(
+        "X-GitHub-Api-Version",
+        reqwest::header::HeaderValue::from_static(COPILOT_API_VERSION),
+    );
+    headers.insert(
+        "Editor-Version",
+        reqwest::header::HeaderValue::from_static("vscode/1.85.0"),
+    );
+    headers.insert(
+        "Copilot-Integration-Id",
+        reqwest::header::HeaderValue::from_static("vscode-chat"),
+    );
+    Ok(headers)
+}
+
+#[tauri::command]
+async fn copilot_models(session_token: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get(format!("{}/models", COPILOT_API_BASE))
+        .headers(copilot_api_headers(&session_token)?)
+        .send()
+        .await
+        .map_err(|e| format!("Models fetch failed: {}", e))?;
+
+    if !res.status().is_success() {
+        return Err(format!("Models fetch failed: HTTP {}", res.status()));
+    }
+
+    res.text().await.map_err(|e| format!("Models fetch failed: {}", e))
+}
+
+#[tauri::command]
+async fn copilot_chat(
+    session_token: String,
+    model: String,
+    system_prompt: String,
+    user_message: String,
+) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let mut headers = copilot_api_headers(&session_token)?;
+    headers.insert(
+        reqwest::header::CONTENT_TYPE,
+        reqwest::header::HeaderValue::from_static("application/json"),
+    );
+
+    let body = serde_json::json!({
+        "model": model,
+        "messages": [
+            { "role": "system", "content": system_prompt },
+            { "role": "user", "content": user_message }
+        ]
+    });
+
+    let res = client
+        .post(format!("{}/chat/completions", COPILOT_API_BASE))
+        .headers(headers)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Chat failed: {}", e))?;
+
+    if !res.status().is_success() {
+        return Err(format!("Chat failed: HTTP {}", res.status()));
+    }
+
+    res.text().await.map_err(|e| format!("Chat failed: {}", e))
+}
+
 mod os_integration;
 
 static SETTINGS_OPENING: AtomicBool = AtomicBool::new(false);
@@ -197,6 +369,7 @@ fn get_caret_position() -> CaretPosition {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -329,7 +502,12 @@ pub fn run() {
             open_settings,
             notify_dom_ready,
             paste_text,
-            get_caret_position
+            get_caret_position,
+            copilot_device_code,
+            copilot_poll_token,
+            copilot_exchange_token,
+            copilot_models,
+            copilot_chat,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
