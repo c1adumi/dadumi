@@ -188,7 +188,7 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
   };
 
   return (
-    <div data-tauri-drag-region className={`glass-container ${isGenerating ? "processing" : ""}`}>
+    <div data-tauri-drag-region className={`glass-container ${isGenerating ? "processing" : ""}`} onClick={(e) => e.stopPropagation()}>
       <div data-tauri-drag-region className="drag-handle" onMouseDown={handleDragStart}>
         <span className="drag-indicator" />
       </div>

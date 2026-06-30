@@ -87,6 +87,7 @@ function App() {
   return (
     <div 
       className={`app-root ${isTauri() ? "in-tauri" : "browser-env"}`}
+      onClick={(e) => { if (e.target === e.currentTarget) handleHide(); }}
     >
       {/* Floating Overlay Menu */}
       {isOpen && (
