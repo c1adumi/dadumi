@@ -2,6 +2,8 @@ use tauri::{Manager, Emitter, WebviewWindowBuilder, WebviewUrl};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, GlobalShortcutExt};
+#[cfg(windows)]
+use tauri::WebviewWindowExt;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -480,11 +482,14 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            #[cfg(windows)]
             let accessibility_hwnd: isize = app
                 .get_webview_window("main")
                 .and_then(|w| w.hwnd().ok())
                 .map(|h| h.0 as isize)
                 .unwrap_or(0);
+            #[cfg(not(windows))]
+            let accessibility_hwnd: isize = 0;
             os_integration::request_accessibility_if_needed(accessibility_hwnd);
 
             let show_i = MenuItemBuilder::with_id("show", "Show Assistant").build(app)?;
