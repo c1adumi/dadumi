@@ -82,8 +82,7 @@ export default function SettingsWindow() {
         if (!abort.signal.aborted) setCopilotStatus("error");
         return;
       }
-      setConfigField("apiKey", token);
-      persistConfigField();
+      setConfigField("githubToken", token);
       setCopilotStatus("success");
       setCopilotUserCode(null);
     } catch {
@@ -265,7 +264,7 @@ export default function SettingsWindow() {
             >
               {copilotStatus === "pending"
                 ? "Waiting for authorization..."
-                : activeProviderSettings.config.apiKey
+                : activeProviderSettings.config.githubToken
                   ? "Re-authenticate"
                   : "Login with GitHub"}
             </button>
@@ -273,7 +272,7 @@ export default function SettingsWindow() {
         )}
 
         {activeProviderDef.fields
-          .filter((field) => !(settings.activeProvider === "github-copilot" && field.key === "apiKey"))
+          .filter((field) => !(settings.activeProvider === "github-copilot" && field.key === "githubToken"))
           .map((field) => (
           <div key={field.key} className="settings-section">
             <label className="form-label">{field.label}</label>
