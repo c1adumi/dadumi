@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static SOURCE_WID: AtomicU64 = AtomicU64::new(0);
 
-pub fn request_accessibility_if_needed() {
+pub fn request_accessibility_if_needed(_owner_hwnd: isize) {
     let xdotool_missing = std::process::Command::new("which")
         .arg("xdotool")
         .output()
