@@ -31,7 +31,7 @@ extern "C" {
     fn AXIsProcessTrustedWithOptions(options: *const std::ffi::c_void) -> bool;
 }
 
-pub fn request_accessibility_if_needed() {
+pub fn request_accessibility_if_needed(_owner_hwnd: isize) {
     unsafe {
         let trusted: bool = {
             let cls_dict = objc::runtime::Class::get("NSDictionary").unwrap();

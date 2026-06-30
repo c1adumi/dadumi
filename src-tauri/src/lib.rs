@@ -2,6 +2,8 @@ use tauri::{Manager, Emitter, WebviewWindowBuilder, WebviewUrl};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, GlobalShortcutExt};
+#[cfg(windows)]
+use tauri::WebviewWindow;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -271,9 +273,59 @@ fn notify_dom_ready(app: tauri::AppHandle) {
     SETTINGS_OPENING.store(false, Ordering::SeqCst);
 }
 
+fn center_on_same_monitor(
+    anchor_win: &tauri::WebviewWindow,
+    win_w: f64,
+    win_h: f64,
+) -> tauri::PhysicalPosition<i32> {
+    let anchor_pos = anchor_win
+        .outer_position()
+        .unwrap_or(tauri::PhysicalPosition::new(0, 0));
+
+    if let Ok(monitors) = anchor_win.available_monitors() {
+        for monitor in &monitors {
+            let m_pos = monitor.position();
+            let m_size = monitor.size();
+            let scale = monitor.scale_factor();
+            let pw = (win_w * scale) as i32;
+            let ph = (win_h * scale) as i32;
+
+            let in_x = anchor_pos.x >= m_pos.x
+                && anchor_pos.x < m_pos.x + m_size.width as i32;
+            let in_y = anchor_pos.y >= m_pos.y
+                && anchor_pos.y < m_pos.y + m_size.height as i32;
+
+            if in_x && in_y {
+                return tauri::PhysicalPosition::new(
+                    m_pos.x + (m_size.width as i32 - pw) / 2,
+                    m_pos.y + (m_size.height as i32 - ph) / 2,
+                );
+            }
+        }
+
+        if let Some(primary) = monitors.first() {
+            let m_pos = primary.position();
+            let m_size = primary.size();
+            let scale = primary.scale_factor();
+            let pw = (win_w * scale) as i32;
+            let ph = (win_h * scale) as i32;
+            return tauri::PhysicalPosition::new(
+                m_pos.x + (m_size.width as i32 - pw) / 2,
+                m_pos.y + (m_size.height as i32 - ph) / 2,
+            );
+        }
+    }
+
+    tauri::PhysicalPosition::new(0, 0)
+}
+
 fn show_settings_window(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("settings") {
         ensure_settings_window_close_handler(app, &win);
+        if let Some(main) = app.get_webview_window("main") {
+            let pos = center_on_same_monitor(&main, 420.0, 500.0);
+            let _ = win.set_position(tauri::Position::Physical(pos));
+        }
         let _ = win.unminimize();
         let _ = win.show();
         let _ = win.set_focus();
@@ -283,7 +335,11 @@ fn show_settings_window(app: &tauri::AppHandle) {
 
     SETTINGS_OPENING.store(true, Ordering::SeqCst);
 
-    let win = match WebviewWindowBuilder::new(
+    let initial_pos: Option<tauri::PhysicalPosition<i32>> = app
+        .get_webview_window("main")
+        .map(|main| center_on_same_monitor(&main, 420.0, 500.0));
+
+    let mut builder = WebviewWindowBuilder::new(
         app,
         "settings",
         WebviewUrl::App("index.html".into()),
@@ -295,11 +351,14 @@ fn show_settings_window(app: &tauri::AppHandle) {
     .transparent(false)
     .always_on_top(true)
     .initialization_script("window.__DADUMI_VIEW = 'settings';")
-    // Keep this window visible right after creation so Windows does not depend
-    // on renderer timing to surface the settings UI.
     .visible(true)
-    .skip_taskbar(false)
-    .build() {
+    .skip_taskbar(false);
+
+    if let Some(pos) = initial_pos {
+        builder = builder.position(pos.x as f64, pos.y as f64);
+    }
+
+    let win = match builder.build() {
         Ok(w) => w,
         Err(_) => {
             SETTINGS_OPENING.store(false, Ordering::SeqCst);
@@ -423,7 +482,15 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
-            os_integration::request_accessibility_if_needed();
+            #[cfg(windows)]
+            let accessibility_hwnd: isize = app
+                .get_webview_window("main")
+                .and_then(|w| w.hwnd().ok())
+                .map(|h| h.0 as isize)
+                .unwrap_or(0);
+            #[cfg(not(windows))]
+            let accessibility_hwnd: isize = 0;
+            os_integration::request_accessibility_if_needed(accessibility_hwnd);
 
             let show_i = MenuItemBuilder::with_id("show", "Show Assistant").build(app)?;
             let settings_i = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
@@ -488,7 +555,16 @@ pub fn run() {
                                 .and_then(|w| w.is_visible().ok())
                                 .unwrap_or(false);
                             if !settings_busy && !settings_visible {
-                                let _ = w_clone.hide();
+                                let w_delayed = w_clone.clone();
+                                std::thread::spawn(move || {
+                                    std::thread::sleep(std::time::Duration::from_millis(150));
+                                    let still_unfocused = w_delayed
+                                        .is_focused()
+                                        .unwrap_or(false);
+                                    if !still_unfocused {
+                                        let _ = w_delayed.hide();
+                                    }
+                                });
                             }
                         }
                     }

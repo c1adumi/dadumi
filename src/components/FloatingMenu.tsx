@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invokeCmd, isTauri } from "../utils/tauriBridge";
 import { parseProviderResponse } from "../utils/providers";
 import { useSettings } from "../context/SettingsContext";
@@ -46,7 +47,6 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [dragReady, setDragReady] = useState(false);
   const [focusedPresetIndex, setFocusedPresetIndex] = useState(0);
 
   const streamEndRef = useRef<HTMLDivElement>(null);
@@ -129,17 +129,11 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isGenerating, selectionText, focusedPresetIndex, presetInstructions, onPresetChange]);
 
-  const handleDragStart = async (e: React.MouseEvent) => {
-    if (e.button !== 0 || !isTauri() || !dragReady) return;
+  const handleDragStart = (e: React.MouseEvent) => {
+    if (e.button !== 0 || !isTauri()) return;
     e.preventDefault();
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
     getCurrentWindow().startDragging();
   };
-
-  useEffect(() => {
-    const t = setTimeout(() => setDragReady(true), 300);
-    return () => clearTimeout(t);
-  }, []);
 
   useEffect(() => {
     if (streamEndRef.current) {
@@ -194,7 +188,7 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
   };
 
   return (
-    <div data-tauri-drag-region className={`glass-container ${isGenerating ? "processing" : ""}`}>
+    <div data-tauri-drag-region className={`glass-container ${isGenerating ? "processing" : ""}`} onClick={(e) => e.stopPropagation()}>
       <div data-tauri-drag-region className="drag-handle" onMouseDown={handleDragStart}>
         <span className="drag-indicator" />
       </div>

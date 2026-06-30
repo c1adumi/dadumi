@@ -234,14 +234,14 @@ pub fn restore_source_app() {
     }
 }
 
-pub fn request_accessibility_if_needed() {
+pub fn request_accessibility_if_needed(owner_hwnd: isize) {
     if is_elevated() {
-        thread::spawn(|| unsafe {
+        thread::spawn(move || unsafe {
             let msg: Vec<u16> = "Dadumi is running as administrator.\nText capture may not work in non-elevated apps.\nConsider running Dadumi without administrator privileges."
                 .encode_utf16().chain(std::iter::once(0)).collect();
-            let title: Vec<u16> = "Dadumi – Notice"
+            let title: Vec<u16> = "Dadumi \u{2013} Notice"
                 .encode_utf16().chain(std::iter::once(0)).collect();
-            MessageBoxW(0isize as _, msg.as_ptr(), title.as_ptr(), MB_OK | MB_ICONWARNING);
+            MessageBoxW(owner_hwnd as _, msg.as_ptr(), title.as_ptr(), MB_OK | MB_ICONWARNING);
         });
     }
 }
