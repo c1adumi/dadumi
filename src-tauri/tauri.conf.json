@@ -40,7 +40,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' tauri: https://tauri.localhost; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://bedrock-runtime.us-east-1.amazonaws.com https://bedrock-runtime.us-west-2.amazonaws.com https://bedrock-runtime.ap-northeast-1.amazonaws.com https://bedrock-runtime.ap-northeast-2.amazonaws.com https://bedrock-runtime.ap-southeast-2.amazonaws.com https://bedrock-runtime.eu-west-1.amazonaws.com https://bedrock.us-east-1.amazonaws.com https://openrouter.ai https://api.githubcopilot.com https://api.github.com https://github.com https://copilot-proxy.githubusercontent.com http: https:; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: https://asset.localhost"
     }
   },
   "bundle": {
