@@ -1,5 +1,47 @@
 import { invokeCmd, isTauri } from "./tauriBridge"
 
+interface CopilotSessionCache {
+  token: string
+  expiresAt: number
+}
+
+let copilotSessionCache: CopilotSessionCache | null = null
+let exchangeInProgress: Promise<string> | null = null
+
+async function getCopilotSessionToken(githubToken: string): Promise<string> {
+  if (exchangeInProgress) return exchangeInProgress
+
+  if (copilotSessionCache && copilotSessionCache.expiresAt - Date.now() > 5 * 60 * 1000) {
+    return copilotSessionCache.token
+  }
+
+  const exchange = (async () => {
+    try {
+      const data = await invokeCmd("copilot_exchange_token", { githubToken }) as {
+        token: string
+        expires_at: number
+      }
+      copilotSessionCache = {
+        token: data.token,
+        expiresAt: data.expires_at * 1000,
+      }
+      return data.token
+    } catch (err: any) {
+      copilotSessionCache = null
+      throw new Error(
+        err?.message?.includes("re-authenticate")
+          ? "Copilot authentication expired. Please re-authenticate."
+          : `Copilot token exchange failed: ${err?.message ?? err}`
+      )
+    } finally {
+      exchangeInProgress = null
+    }
+  })()
+
+  exchangeInProgress = exchange
+  return exchange
+}
+
 export type ProviderID =
   | "openai"
   | "anthropic"
@@ -300,19 +342,26 @@ export async function copilotOAuthFlow(): Promise<{
   }
 }
 
-async function fetchCopilotModels(token: string): Promise<ModelDef[]> {
-  const res = await fetch(`${COPILOT_BASE_URL}/models`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "X-GitHub-Api-Version": COPILOT_API_VERSION,
-    },
-    signal: AbortSignal.timeout(5000),
-  })
-  if (!res.ok) return []
-  const data = await res.json() as { data?: { id: string; name: string; model_picker_enabled: boolean }[] }
-  return (data.data ?? [])
-    .filter((m) => m.model_picker_enabled)
-    .map((m) => ({ id: m.id, label: m.name }))
+async function fetchCopilotModels(githubToken: string): Promise<ModelDef[]> {
+  try {
+    const sessionToken = await getCopilotSessionToken(githubToken)
+    const res = await fetch(`${COPILOT_BASE_URL}/models`, {
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        "X-GitHub-Api-Version": COPILOT_API_VERSION,
+        "Editor-Version": "vscode/1.85.0",
+        "Copilot-Integration-Id": "vscode-chat",
+      },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return []
+    const data = await res.json() as { data?: { id: string; name: string; model_picker_enabled: boolean }[] }
+    return (data.data ?? [])
+      .filter((m) => m.model_picker_enabled)
+      .map((m) => ({ id: m.id, label: m.name }))
+  } catch {
+    return []
+  }
 }
 
 export const copilot: ProviderDef = {
@@ -320,8 +369,8 @@ export const copilot: ProviderDef = {
   label: "GitHub Copilot",
   fields: [
     {
-      key: "apiKey",
-      label: "Access Token",
+      key: "githubToken",
+      label: "GitHub OAuth Token",
       type: "password",
       placeholder: "Managed by OAuth login",
     },
@@ -331,16 +380,26 @@ export const copilot: ProviderDef = {
     { id: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
   ],
   async fetchModels(config) {
-    if (!config.apiKey) return copilot.models
-    const models = await fetchCopilotModels(config.apiKey)
+    if (!config.githubToken) return copilot.models
+    const models = await fetchCopilotModels(config.githubToken)
     return models.length > 0 ? models : copilot.models
   },
-  buildRequest(config, model, systemPrompt, userMessage, signal) {
-    return fetch(`${COPILOT_BASE_URL}/chat/completions`, {
+  async buildRequest(config, model, systemPrompt, userMessage, signal) {
+    const githubToken = config.githubToken
+    if (!githubToken) {
+      return new Response(
+        JSON.stringify({ error: { message: "GitHub token not found. Please re-authenticate." } }),
+        { status: 401 }
+      )
+    }
+
+    const sessionToken = await getCopilotSessionToken(githubToken)
+
+    const res = await fetch(`${COPILOT_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
+        Authorization: `Bearer ${sessionToken}`,
         "Editor-Version": "vscode/1.85.0",
         "Copilot-Integration-Id": "vscode-chat",
         "X-GitHub-Api-Version": COPILOT_API_VERSION,
@@ -354,6 +413,18 @@ export const copilot: ProviderDef = {
       }),
       signal,
     })
+
+    if (res.status === 403) {
+      const body = await invokeCmd("copilot_chat", {
+        sessionToken,
+        model,
+        systemPrompt,
+        userMessage,
+      }) as string
+      return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } })
+    }
+
+    return res
   },
 }
 
