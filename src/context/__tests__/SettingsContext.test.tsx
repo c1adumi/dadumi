@@ -1,8 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsProvider, useSettings } from "../SettingsContext";
 import type { ProviderID } from "../../utils/providers";
+
+const mockFetch = vi.fn();
+globalThis.fetch = mockFetch;
 
 function TestConsumer() {
   const ctx = useSettings();
@@ -29,6 +32,12 @@ function TestConsumer() {
 }
 
 describe("SettingsContext", () => {
+  beforeEach(() => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ inferenceProfileSummaries: [] }), { status: 200 })
+    );
+  });
+
   describe("useSettings()", () => {
     it("throws when used outside provider", () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});

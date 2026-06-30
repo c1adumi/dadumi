@@ -10,6 +10,9 @@ vi.mock("../../utils/tauriBridge", () => ({
   openUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
+const mockFetch = vi.fn();
+globalThis.fetch = mockFetch;
+
 function renderSettingsWindow() {
   return render(
     <SettingsProvider>
@@ -21,6 +24,9 @@ function renderSettingsWindow() {
 describe("SettingsWindow", () => {
   beforeEach(() => {
     localStorage.clear();
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ inferenceProfileSummaries: [] }), { status: 200 })
+    );
   });
 
   describe("header", () => {
