@@ -3,7 +3,7 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, GlobalShortcutExt};
 #[cfg(windows)]
-use tauri::WebviewWindowExt;
+use tauri::WebviewWindow;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
