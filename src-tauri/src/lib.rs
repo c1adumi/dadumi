@@ -156,6 +156,7 @@ async fn copilot_chat(
     model: String,
     system_prompt: String,
     user_message: String,
+    enable_thinking: bool,
 ) -> Result<String, String> {
     let client = reqwest::Client::new();
     let mut headers = copilot_api_headers(&session_token)?;
@@ -171,7 +172,7 @@ async fn copilot_chat(
         "Openai-Intent",
         reqwest::header::HeaderValue::from_static("conversation-edits"),
     );
-    if model.to_lowercase().contains("claude") {
+    if model.to_lowercase().contains("claude") && enable_thinking {
         headers.insert(
             "anthropic-beta",
             reqwest::header::HeaderValue::from_static("interleaved-thinking-2025-05-14"),
@@ -195,11 +196,27 @@ async fn copilot_chat(
     }
     messages.push(serde_json::json!({ "role": "user", "content": user_message }));
 
-    let body = serde_json::json!({
-        "model": model,
-        "messages": messages,
-        "stream": false
-    });
+    let m = model.to_lowercase();
+    let needs_reasoning_control = m.starts_with("o1")
+        || m.starts_with("o3")
+        || m.starts_with("o4")
+        || m.contains("gpt-5")
+        || m.contains("gemini");
+
+    let body = if !enable_thinking && needs_reasoning_control {
+        serde_json::json!({
+            "model": model,
+            "messages": messages,
+            "stream": false,
+            "reasoning_effort": "none"
+        })
+    } else {
+        serde_json::json!({
+            "model": model,
+            "messages": messages,
+            "stream": false
+        })
+    };
 
     let res = client
         .post(format!("{}/chat/completions", COPILOT_API_BASE))

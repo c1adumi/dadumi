@@ -43,6 +43,7 @@ export default function SettingsWindow() {
     setLanguage,
     setInsertShortcutKey,
     setAutoTrigger,
+    setCopilotThinking,
     persistConfigField,
     refreshModels,
   } = useSettings();
@@ -269,6 +270,27 @@ export default function SettingsWindow() {
                   ? "Re-authenticate"
                   : "Login with GitHub"}
             </button>
+          </div>
+        )}
+
+        {settings.activeProvider === "github-copilot" && (
+          <div className="settings-section">
+            <label className="form-label">Thinking Mode</label>
+            <p className="form-hint">Enable deep reasoning for Claude &amp; Gemini models. Slower but more thorough.</p>
+            <div className="theme-switcher">
+              <button
+                className={`theme-option ${!settings.copilotThinking ? "active" : ""}`}
+                onClick={() => setCopilotThinking(false)}
+              >
+                <span>Off</span>
+              </button>
+              <button
+                className={`theme-option ${settings.copilotThinking ? "active" : ""}`}
+                onClick={() => setCopilotThinking(true)}
+              >
+                <span>On</span>
+              </button>
+            </div>
           </div>
         )}
 

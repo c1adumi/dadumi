@@ -18,6 +18,7 @@ export interface AppSettings {
   theme: Theme
   insertShortcutKey: string
   autoTrigger: boolean
+  copilotThinking: boolean
   providers: Partial<Record<ProviderID, ProviderSettings>>
 }
 
@@ -31,6 +32,7 @@ function defaultSettings(): AppSettings {
     theme: "dark",
     insertShortcutKey: "Enter",
     autoTrigger: false,
+    copilotThinking: false,
     providers: { bedrock: defaultProviderSettings("bedrock") },
   }
 }
@@ -80,6 +82,7 @@ function migrateSettings(settings: AppSettings): AppSettings {
     theme: settings.theme ?? "dark",
     insertShortcutKey: settings.insertShortcutKey ?? "Enter",
     autoTrigger: settings.autoTrigger ?? false,
+    copilotThinking: settings.copilotThinking ?? false,
     providers,
   }
 }

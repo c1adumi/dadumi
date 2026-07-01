@@ -32,6 +32,7 @@ describe("settings", () => {
         theme: "light",
         insertShortcutKey: "j",
         autoTrigger: true,
+        copilotThinking: true,
         providers: {},
       };
       localStorage.setItem("dadumi_settings", JSON.stringify(saved));

@@ -454,6 +454,7 @@ export const copilot: ProviderDef = {
     }
 
     const sessionToken = await getCopilotSessionToken(githubToken)
+    const enableThinking = config._thinking === "true"
 
     if (isTauri()) {
       const attempt = async (token: string) => {
@@ -462,6 +463,7 @@ export const copilot: ProviderDef = {
           model,
           systemPrompt,
           userMessage,
+          enableThinking,
         }) as string
         return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } })
       }

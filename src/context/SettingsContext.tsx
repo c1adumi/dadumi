@@ -27,6 +27,7 @@ interface SettingsContextValue {
   setTheme: (theme: Theme) => void;
   setInsertShortcutKey: (key: string) => void;
   setAutoTrigger: (enabled: boolean) => void;
+  setCopilotThinking: (enabled: boolean) => void;
   persistConfigField: () => void;
   refreshModels: () => void;
   currentSystemPrompt: string;
@@ -46,7 +47,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const activeProviderDef = getProvider(settings.activeProvider);
-  const activeProviderSettings = getActiveProviderSettings(settings);
+  const baseProviderSettings = getActiveProviderSettings(settings);
+  const activeProviderSettings = settings.activeProvider === "github-copilot"
+    ? { ...baseProviderSettings, config: { ...baseProviderSettings.config, _thinking: settings.copilotThinking ? "true" : "false" } }
+    : baseProviderSettings;
 
   const fetchModels = useCallback(async (providerDef: ProviderDef, config: Record<string, string>) => {
     if (!providerDef.fetchModels) return;
@@ -122,6 +126,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     persist({ ...settings, autoTrigger: enabled });
   }, [settings, persist]);
 
+  const setCopilotThinking = useCallback((enabled: boolean) => {
+    persist({ ...settings, copilotThinking: enabled });
+  }, [settings, persist]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme ?? "dark";
   }, [settings.theme]);
@@ -158,6 +166,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setTheme,
     setInsertShortcutKey,
     setAutoTrigger,
+    setCopilotThinking,
     persistConfigField,
     refreshModels,
     currentSystemPrompt: getSystemPrompt(settings),
