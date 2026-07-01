@@ -361,9 +361,9 @@ async function fetchCopilotModels(githubToken: string): Promise<ModelDef[]> {
       if (!res.ok) return []
       json = await res.text()
     }
-    const data = JSON.parse(json) as { data?: { id: string; name: string; model_picker_enabled: boolean }[] }
+    const data = JSON.parse(json) as { data?: { id: string; name: string; capabilities?: { type?: string } }[] }
     return (data.data ?? [])
-      .filter((m) => m.model_picker_enabled)
+      .filter((m) => m.capabilities?.type === "chat")
       .map((m) => ({ id: m.id, label: m.name }))
   } catch {
     return []
