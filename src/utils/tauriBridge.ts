@@ -12,7 +12,7 @@ export async function invokeCmd(command: string, args?: any): Promise<any> {
     const { invoke } = await import("@tauri-apps/api/core");
     return invoke(command, args).catch((err: any) => {
       console.error(`[Tauri] Command "${command}" failed:`, err);
-      throw err;
+      throw err instanceof Error ? err : new Error(typeof err === "string" ? err : JSON.stringify(err));
     });
   }
 

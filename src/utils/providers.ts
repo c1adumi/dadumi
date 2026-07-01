@@ -402,13 +402,18 @@ export const copilot: ProviderDef = {
     const sessionToken = await getCopilotSessionToken(githubToken)
 
     if (isTauri()) {
-      const body = await invokeCmd("copilot_chat", {
-        sessionToken,
-        model,
-        systemPrompt,
-        userMessage,
-      }) as string
-      return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } })
+      try {
+        const body = await invokeCmd("copilot_chat", {
+          sessionToken,
+          model,
+          systemPrompt,
+          userMessage,
+        }) as string
+        return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } })
+      } catch (err: any) {
+        const message = err?.message ?? String(err)
+        return new Response(JSON.stringify({ error: { message } }), { status: 502 })
+      }
     }
 
     return fetch(`${COPILOT_BASE_URL}/chat/completions`, {

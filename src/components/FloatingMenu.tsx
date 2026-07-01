@@ -87,8 +87,10 @@ export default function FloatingMenu({ selectionText, onHide, initialPreset, onP
 
       setStreamedText(await parseProviderResponse(settings.activeProvider, response));
     } catch (err: any) {
-      if (err.name !== "AbortError") {
-        setErrorMessage(`Error: ${err.message}`);
+      const isAbort = err?.name === "AbortError" || (typeof err === "string" && err.includes("Abort"));
+      if (!isAbort) {
+        const message = err?.message ?? (typeof err === "string" ? err : String(err));
+        setErrorMessage(`Error: ${message}`);
       }
     } finally {
       setIsGenerating(false);
