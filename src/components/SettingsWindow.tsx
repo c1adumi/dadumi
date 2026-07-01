@@ -303,6 +303,7 @@ export default function SettingsWindow() {
       </div>
 
       <div className="settings-window-footer">
+        <span className="settings-window-credit">LGE SW Bootcamp 1기 C반 1팀</span>
         <button className="btn btn-confirm" onClick={handleConfirm}>
           {tr.settings.confirm}
         </button>

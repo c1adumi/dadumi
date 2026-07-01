@@ -115,8 +115,16 @@ fn copilot_api_headers(session_token: &str) -> Result<reqwest::header::HeaderMap
         reqwest::header::HeaderValue::from_static(COPILOT_API_VERSION),
     );
     headers.insert(
+        reqwest::header::USER_AGENT,
+        reqwest::header::HeaderValue::from_static("GitHubCopilotChat/0.26.7"),
+    );
+    headers.insert(
         "Editor-Version",
-        reqwest::header::HeaderValue::from_static("vscode/1.85.0"),
+        reqwest::header::HeaderValue::from_static("vscode/1.99.3"),
+    );
+    headers.insert(
+        "Editor-Plugin-Version",
+        reqwest::header::HeaderValue::from_static("copilot-chat/0.26.7"),
     );
     headers.insert(
         "Copilot-Integration-Id",
@@ -155,6 +163,20 @@ async fn copilot_chat(
         reqwest::header::CONTENT_TYPE,
         reqwest::header::HeaderValue::from_static("application/json"),
     );
+    headers.insert(
+        "X-Initiator",
+        reqwest::header::HeaderValue::from_static("user"),
+    );
+    headers.insert(
+        "Openai-Intent",
+        reqwest::header::HeaderValue::from_static("conversation-edits"),
+    );
+    if model.to_lowercase().contains("claude") {
+        headers.insert(
+            "anthropic-beta",
+            reqwest::header::HeaderValue::from_static("interleaved-thinking-2025-05-14"),
+        );
+    }
 
     let body = serde_json::json!({
         "model": model,
@@ -173,7 +195,9 @@ async fn copilot_chat(
         .map_err(|e| format!("Chat failed: {}", e))?;
 
     if !res.status().is_success() {
-        return Err(format!("Chat failed: HTTP {}", res.status()));
+        let status = res.status();
+        let body = res.text().await.unwrap_or_else(|_| "<no body>".to_string());
+        return Err(format!("Chat failed: HTTP {} — {}", status, body));
     }
 
     res.text().await.map_err(|e| format!("Chat failed: {}", e))

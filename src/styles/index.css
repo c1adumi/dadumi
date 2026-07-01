@@ -842,7 +842,17 @@ body,
   padding: 16px 24px;
   border-top: 1px solid var(--hairline);
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-window-credit {
+  font-family: var(--font-body);
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+  user-select: none;
 }
 
 .form-hint {
