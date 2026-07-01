@@ -381,9 +381,21 @@ async function fetchCopilotModels(githubToken: string): Promise<ModelDef[]> {
       json = await res.text()
     }
     const data = JSON.parse(json) as { data?: CopilotModelEntry[] }
-    return (data.data ?? [])
-      .filter(isUsableCopilotChatModel)
-      .map((m) => ({ id: m.id, label: m.name }))
+    const usable = (data.data ?? []).filter(isUsableCopilotChatModel)
+    const byLabel = new Map<string, CopilotModelEntry>()
+    for (const m of usable) {
+      const existing = byLabel.get(m.name)
+      if (!existing || m.id.length < existing.id.length) byLabel.set(m.name, m)
+    }
+    const seen = new Set<string>()
+    const deduped: ModelDef[] = []
+    for (const m of usable) {
+      if (seen.has(m.name)) continue
+      seen.add(m.name)
+      const chosen = byLabel.get(m.name)!
+      deduped.push({ id: chosen.id, label: chosen.name })
+    }
+    return deduped
   } catch {
     return []
   }
