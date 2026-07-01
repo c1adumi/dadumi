@@ -189,12 +189,15 @@ async fn copilot_chat(
         "system"
     };
 
+    let mut messages: Vec<serde_json::Value> = Vec::new();
+    if !system_prompt.trim().is_empty() {
+        messages.push(serde_json::json!({ "role": system_role, "content": system_prompt }));
+    }
+    messages.push(serde_json::json!({ "role": "user", "content": user_message }));
+
     let body = serde_json::json!({
         "model": model,
-        "messages": [
-            { "role": system_role, "content": system_prompt },
-            { "role": "user", "content": user_message }
-        ],
+        "messages": messages,
         "stream": false
     });
 

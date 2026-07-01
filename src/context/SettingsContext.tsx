@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import {
   loadSettings,
   saveSettings,
@@ -38,6 +38,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   const [dynamicModels, setDynamicModels] = useState<ModelDef[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const prevCopilotTokenRef = useRef<string | undefined>(undefined);
 
   const persist = useCallback((next: AppSettings) => {
     setSettings(next);
@@ -68,7 +69,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const copilotToken = settings.providers["github-copilot"]?.config.githubToken;
-    if (settings.activeProvider === "github-copilot" && copilotToken) {
+    if (settings.activeProvider === "github-copilot" && copilotToken && copilotToken !== prevCopilotTokenRef.current) {
+      prevCopilotTokenRef.current = copilotToken;
       fetchModels(activeProviderDef, activeProviderSettings.config);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

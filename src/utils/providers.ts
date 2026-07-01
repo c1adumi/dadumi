@@ -11,7 +11,7 @@ let exchangeInProgress: Promise<string> | null = null
 async function getCopilotSessionToken(githubToken: string): Promise<string> {
   if (exchangeInProgress) return exchangeInProgress
 
-  if (copilotSessionCache && copilotSessionCache.expiresAt - Date.now() > 5 * 60 * 1000) {
+  if (copilotSessionCache && copilotSessionCache.expiresAt - Date.now() > 10 * 60 * 1000) {
     return copilotSessionCache.token
   }
 
@@ -40,6 +40,10 @@ async function getCopilotSessionToken(githubToken: string): Promise<string> {
 
   exchangeInProgress = exchange
   return exchange
+}
+
+function invalidateCopilotSessionCache(): void {
+  copilotSessionCache = null
 }
 
 export type ProviderID =
@@ -452,17 +456,32 @@ export const copilot: ProviderDef = {
     const sessionToken = await getCopilotSessionToken(githubToken)
 
     if (isTauri()) {
-      try {
+      const attempt = async (token: string) => {
         const body = await invokeCmd("copilot_chat", {
-          sessionToken,
+          sessionToken: token,
           model,
           systemPrompt,
           userMessage,
         }) as string
         return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } })
+      }
+
+      try {
+        return await attempt(sessionToken)
       } catch (err: any) {
-        const message = err?.message ?? String(err)
-        return new Response(JSON.stringify({ error: { message } }), { status: 502 })
+        const msg: string = err?.message ?? String(err)
+        const isExpired = msg.includes("401") || msg.includes("403") || msg.includes("re-authenticate")
+        if (isExpired) {
+          invalidateCopilotSessionCache()
+          try {
+            const fresh = await getCopilotSessionToken(githubToken)
+            return await attempt(fresh)
+          } catch (retryErr: any) {
+            const retryMsg = retryErr?.message ?? String(retryErr)
+            return new Response(JSON.stringify({ error: { message: retryMsg } }), { status: 502 })
+          }
+        }
+        return new Response(JSON.stringify({ error: { message: msg } }), { status: 502 })
       }
     }
 
