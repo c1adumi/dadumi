@@ -290,6 +290,25 @@ const COPILOT_BASE_URL = "https://api.githubcopilot.com"
 const COPILOT_API_VERSION = "2026-06-01"
 const COPILOT_POLL_SAFETY_MARGIN_MS = 3000
 
+interface CopilotModelEntry {
+  id: string
+  name: string
+  capabilities?: { type?: string }
+  policy?: { state?: string }
+  model_picker_enabled?: boolean
+  supported_endpoints?: string[]
+}
+
+function isUsableCopilotChatModel(m: CopilotModelEntry): boolean {
+  if (m.capabilities?.type !== "chat") return false
+  if (m.policy?.state === "disabled") return false
+  if (m.supported_endpoints && m.supported_endpoints.length > 0) {
+    if (!m.supported_endpoints.includes("/chat/completions")) return false
+  }
+  if (m.model_picker_enabled === false && m.supported_endpoints !== undefined) return false
+  return true
+}
+
 export async function copilotOAuthFlow(): Promise<{
   userCode: string
   verificationUri: string
@@ -361,12 +380,31 @@ async function fetchCopilotModels(githubToken: string): Promise<ModelDef[]> {
       if (!res.ok) return []
       json = await res.text()
     }
-    const data = JSON.parse(json) as { data?: { id: string; name: string; capabilities?: { type?: string } }[] }
+    const data = JSON.parse(json) as { data?: CopilotModelEntry[] }
     return (data.data ?? [])
-      .filter((m) => m.capabilities?.type === "chat")
+      .filter(isUsableCopilotChatModel)
       .map((m) => ({ id: m.id, label: m.name }))
   } catch {
     return []
+  }
+}
+
+export async function enableCopilotModels(githubToken: string): Promise<void> {
+  if (!isTauri()) return
+  try {
+    const sessionToken = await getCopilotSessionToken(githubToken)
+    const json = await invokeCmd("copilot_models", { sessionToken }) as string
+    const data = JSON.parse(json) as { data?: CopilotModelEntry[] }
+    const disabled = (data.data ?? []).filter(
+      (m) => m.capabilities?.type === "chat" && m.policy?.state === "disabled",
+    )
+    await Promise.all(
+      disabled.map((m) =>
+        invokeCmd("copilot_enable_model", { sessionToken, modelId: m.id }).catch(() => false),
+      ),
+    )
+  } catch {
+    return
   }
 }
 

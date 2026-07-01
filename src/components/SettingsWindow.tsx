@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSettings } from "../context/SettingsContext";
 import { isTauri, openUrl } from "../utils/tauriBridge";
-import { PROVIDERS, copilotOAuthFlow, type ProviderID } from "../utils/providers";
+import { PROVIDERS, copilotOAuthFlow, enableCopilotModels, type ProviderID } from "../utils/providers";
 import type { Theme } from "../utils/settings";
 import type { Language } from "../utils/i18n";
 import { DEFAULT_PROMPTS } from "../prompts";
@@ -83,6 +83,7 @@ export default function SettingsWindow() {
         return;
       }
       setConfigField("githubToken", token);
+      await enableCopilotModels(token);
       setCopilotStatus("success");
       setCopilotUserCode(null);
     } catch {

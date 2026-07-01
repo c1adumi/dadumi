@@ -178,12 +178,24 @@ async fn copilot_chat(
         );
     }
 
+    let m = model.to_lowercase();
+    let system_role = if m.starts_with("o1")
+        || m.starts_with("o3")
+        || m.starts_with("o4")
+        || m.contains("gpt-5")
+    {
+        "developer"
+    } else {
+        "system"
+    };
+
     let body = serde_json::json!({
         "model": model,
         "messages": [
-            { "role": "system", "content": system_prompt },
+            { "role": system_role, "content": system_prompt },
             { "role": "user", "content": user_message }
-        ]
+        ],
+        "stream": false
     });
 
     let res = client
@@ -201,6 +213,34 @@ async fn copilot_chat(
     }
 
     res.text().await.map_err(|e| format!("Chat failed: {}", e))
+}
+
+#[tauri::command]
+async fn copilot_enable_model(session_token: String, model_id: String) -> Result<bool, String> {
+    let client = reqwest::Client::new();
+    let mut headers = copilot_api_headers(&session_token)?;
+    headers.insert(
+        reqwest::header::CONTENT_TYPE,
+        reqwest::header::HeaderValue::from_static("application/json"),
+    );
+    headers.insert(
+        "openai-intent",
+        reqwest::header::HeaderValue::from_static("chat-policy"),
+    );
+    headers.insert(
+        "x-interaction-type",
+        reqwest::header::HeaderValue::from_static("chat-policy"),
+    );
+
+    let res = client
+        .post(format!("{}/models/{}/policy", COPILOT_API_BASE, model_id))
+        .headers(headers)
+        .json(&serde_json::json!({ "state": "enabled" }))
+        .send()
+        .await
+        .map_err(|e| format!("Enable model failed: {}", e))?;
+
+    Ok(res.status().is_success())
 }
 
 mod os_integration;
@@ -608,6 +648,7 @@ pub fn run() {
             copilot_exchange_token,
             copilot_models,
             copilot_chat,
+            copilot_enable_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
