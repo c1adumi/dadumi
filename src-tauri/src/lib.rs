@@ -200,8 +200,7 @@ async fn copilot_chat(
     let needs_reasoning_control = m.starts_with("o1")
         || m.starts_with("o3")
         || m.starts_with("o4")
-        || m.contains("gpt-5")
-        || m.contains("gemini");
+        || m.contains("gpt-5");
 
     let body = if !enable_thinking && needs_reasoning_control {
         serde_json::json!({
